@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIS Battle!</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        button {
+            margin: 10px;
+            padding: 15px 30px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border: 2px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        .modal input,
+        .modal label {
+            margin: 10px;
+            display: inline-block;
+        }
+        .modal > div {
+            margin: 15px 0;
+        }
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <h1>GIS Battle!</h1>
+    <button id="play-button">Start Game</button>
+    <button id="join-button">Join Existing Game</button>
+    <button id="browse-button">Browse GIS Toolkit</button>
+
+    <div id="modal-overlay"></div>
+    
+    <div id="start-game-modal" class="modal">
+        <h2>Create New Game</h2>
+        <div>
+            <label for="player-color">Choose your color:</label>
+            <input type="color" id="player-color" name="player-color" value="#ff00ff">
+        </div>
+        <div>
+            <label for="number-cards">Number of Cards:</label>
+            <input type="number" id="number-cards" name="number-cards" value="3" min="1" max="10">
+        </div>
+        <div>
+            <button id="confirm-start-game">Start Game</button>
+            <button id="cancel-start-game">Cancel</button>
+        </div>
+    </div>
+
+    <div id="join-game-modal" class="modal">
+        <h2>Join Existing Game</h2>
+        <div>
+            <label for="game-id-input">Game ID:</label>
+            <input type="text" id="game-id-input" name="game-id-input" placeholder="Enter Game ID">
+        </div>
+        <div>
+            <label for="player-two-color">Choose your color:</label>
+            <input type="color" id="player-two-color" name="player-two-color" value="#0000ff">
+        </div>
+        <div id="join-error" style="color: red; display: none;">Game not found. Please check the Game ID.</div>
+        <div>
+            <button id="confirm-join-game">Join Game</button>
+            <button id="cancel-join-game">Cancel</button>
+        </div>
+    </div>
+
+    <script src='https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js'></script>
+    <script src='https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'></script>
+    <script src='play/firebase-config.js'></script>
+    <script>
+        let db;
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        const gameStatesRef = db.ref('game-states');
+
+        document.getElementById('play-button').onclick = function() {
+            document.getElementById('start-game-modal').style.display = 'block';
+            document.getElementById('modal-overlay').style.display = 'block';
+        };
+
+        document.getElementById('cancel-start-game').onclick = function() {
+            closeModals();
+        };
+
+        document.getElementById('join-button').onclick = function() {
+            document.getElementById('join-game-modal').style.display = 'block';
+            document.getElementById('modal-overlay').style.display = 'block';
+            document.getElementById('join-error').style.display = 'none';
+        };
+
+        document.getElementById('cancel-join-game').onclick = function() {
+            closeModals();
+        };
+
+        document.getElementById('browse-button').onclick = function() {
+            console.log("Browsing the GIS Toolkit...");
+            // TODO: Navigate to toolkit browser page
+        };
+
+        document.getElementById('confirm-start-game').onclick = function() {
+            const playerOneColor = document.getElementById('player-color').value;
+            const numberOfCards = parseInt(document.getElementById('number-cards').value);
+            
+            const hex = playerOneColor;
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const rgbaColor = `rgba(${r}, ${g}, ${b}, 1)`;
+            
+            startGame(rgbaColor, numberOfCards);
+        };
+
+        document.getElementById('confirm-join-game').onclick = function() {
+            const gameId = document.getElementById('game-id-input').value.trim();
+            const playerTwoColor = document.getElementById('player-two-color').value;
+            
+            if (!gameId) {
+                alert("Please enter a Game ID");
+                return;
+            }
+            
+            const hex = playerTwoColor;
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const rgbaColor = `rgba(${r}, ${g}, ${b}, 1)`;
+            
+            joinGame(gameId, rgbaColor);
+        };
+
+        function closeModals() {
+            document.getElementById('start-game-modal').style.display = 'none';
+            document.getElementById('join-game-modal').style.display = 'none';
+            document.getElementById('modal-overlay').style.display = 'none';
+            document.getElementById('join-error').style.display = 'none';
+        }
+
+        function startGame(playerOneColor, numberOfCards) {
+            console.log("Starting game with color:", playerOneColor, "and number of cards:", numberOfCards);
+
+            const gameId = Math.random().toString(36).substring(2, 10);
+            console.log("Game ID:", gameId);
+
+            let remainingDeck = Array.from({ length: 20 }, (_, i) => i + 1);
+            remainingDeck = shuffleArray(remainingDeck);
+
+            let playerOneHand = [];
+            let playerTwoHand = [];
+            
+            for (let i = 0; i < numberOfCards; i++) {
+                playerOneHand.push(remainingDeck.pop());
+                playerTwoHand.push(remainingDeck.pop());
+            }
+
+            gameStatesRef.child(`game-${gameId}`).set({
+                gameId: gameId,
+                currentPlayer: 1,
+                discardPile: JSON.stringify([]),
+                gameState: JSON.stringify(Array(100).fill(0)),
+                previousState: JSON.stringify(Array(100).fill(0)),
+                lastPlayedCard: null,
+                playerOneColor: playerOneColor,
+                playerTwoColor: "rgba(0, 0, 255, 1)",
+                playerOneHand: JSON.stringify(playerOneHand),
+                playerTwoHand: JSON.stringify(playerTwoHand),
+                remainingDeck: JSON.stringify(remainingDeck),
+                pendingMoves: JSON.stringify([])
+            }).then(() => {
+                console.log("Game created successfully!");
+                alert(`Game created! Game ID: ${gameId}\nShare this ID with Player 2`);
+                window.location.href = `play/index.html?gameId=${gameId}&playerId=1`;
+            }).catch((error) => {
+                console.error('Error creating game:', error);
+                alert('Failed to create game. Please try again.');
+            });
+        }
+
+        function joinGame(gameId, playerTwoColor) {
+            console.log("Joining game:", gameId, "with color:", playerTwoColor);
+
+            gameStatesRef.child(`game-${gameId}`).once('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    const gameData = snapshot.val();
+                    
+                    gameStatesRef.child(`game-${gameId}`).update({
+                        playerTwoColor: playerTwoColor
+                    }).then(() => {
+                        console.log("Joined game successfully!");
+                        window.location.href = `play/index.html?gameId=${gameId}&playerId=2`;
+                    }).catch((error) => {
+                        console.error('Error joining game:', error);
+                        alert('Failed to join game. Please try again.');
+                    });
+                } else {
+                    console.log("Game not found");
+                    document.getElementById('join-error').style.display = 'block';
+                }
+            }).catch((error) => {
+                console.error('Error checking game:', error);
+                alert('Error checking game. Please try again.');
+            });
+        }
+
+        function shuffleArray(array) {
+            let currentIndex = array.length, randomIndex;
+
+            while (currentIndex !== 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+
+                [array[currentIndex], array[randomIndex]] = [
+                    array[randomIndex], array[currentIndex]
+                ];
+            }
+
+            return array;
+        }
+    </script>
+</body>
+</html>
