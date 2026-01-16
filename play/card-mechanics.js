@@ -17,9 +17,10 @@ const cardTypes = {
             });
 
             if (successfulTurns > 0) {
+                addLog(`Created ${successfulTurns} features at square ${startSquare}`);
                 return board;
             } else {
-                console.log("Invalid move, try again");
+                addLog("Invalid move, try again");
                 return false;
             }
         }
@@ -33,12 +34,15 @@ const cardTypes = {
         numberOfPlays: 1,
         executionType: "placement",
         execute: function(board, startSquare, player, isValidMove) {
+            let erasedCount = 0;
             this.pattern.forEach(offset => {
                 const target = startSquare + offset;
-                if (isValidMove(startSquare, target, 2)) {
+                if (isValidMove(startSquare, target, 2) && board[target] !== 0) {
                     board[target] = 0;
+                    erasedCount++;
                 }
             });
+            addLog(`Erased ${erasedCount} features`);
             return board;
         },
     },
@@ -61,9 +65,10 @@ const cardTypes = {
             });
 
             if (successfulTurns > 0) {
+                addLog(`Clipped ${successfulTurns} opponent features`);
                 return board;
             } else {
-                console.log("Invalid move, try again");
+                addLog("Invalid move, try again");
                 return false;
             }
         }
@@ -80,8 +85,9 @@ const cardTypes = {
                 const target = startSquare + this.pattern[0];
                 if (isValidMove(startSquare, target) && board[target] == 0) {
                     board[target] = player;
+                    addLog(`Field Collection: Placed feature at square ${startSquare}`);
                 } else {
-                    console.log("Invalid move, try again");
+                    addLog("Invalid move, try again");
                     return false;
             };
             return board;
@@ -95,10 +101,14 @@ const cardTypes = {
         executionType: "immediate",
         execute: function(board, previousState, player) {
             const newBoard= [...board];
+            let filledCount = 0;
             
             board.forEach((space, index) => {
-                interpolateFill(newBoard, board, index, player);
+                if (interpolateFill(newBoard, board, index, player)) {
+                    filledCount++;
+                }
             });
+            addLog(`Interpolate: Filled ${filledCount} squares`);
             return newBoard;
         }      
     },
@@ -114,11 +124,11 @@ const cardTypes = {
 
             const opponentPolygon  = determinePolygon(board, startSquare, opponent);
             if (!opponentPolygon) {
-                console.log("Must click on an opponent's polygon feature");
+                addLog("Must click on an opponent's polygon feature");
                 return false;
             }
 
-            let toughingPlayerFeature = false;
+            let touchingPlayerFeature = false;
 
             for (const square of opponentPolygon) {
                 const neighbors = [square - 1, square + 1, square - 10, square + 10];
@@ -139,7 +149,7 @@ const cardTypes = {
             }
             
             if (!touchingPlayerFeature) {
-                console.log("Opponent's polygon must be touching one of your polygon or line features");
+                addLog("Opponent's polygon must be touching one of your polygon or line features");
                 return false;
             }
             
@@ -147,7 +157,7 @@ const cardTypes = {
                 board[square] = player;
             });
             
-            console.log(`Dissolved opponent polygon of ${opponentPolygon.length} squares`);
+            addLog(`Dissolved opponent polygon of ${opponentPolygon.length} squares`);
             return board;
         }    
     },
@@ -160,7 +170,7 @@ const cardTypes = {
         movesRemaining: 6,
         execute: function(board, fromSquare, toSquare, player, isValidMove) {            
             if (board[fromSquare] === 0) {
-                console.log("No piece at selected square");
+                addLog("No piece at selected square");
                 return false;
             }
             
@@ -173,25 +183,25 @@ const cardTypes = {
             const colDiff = Math.abs(fromCol - toCol);
             
             if (rowDiff > 1 || colDiff > 1 || (rowDiff === 0 && colDiff === 0)) {
-                console.log("Can only move one space at a time");
+                addLog("Can only move one space at a time");
                 return false;
             }
             
             if (toSquare < 0 || toSquare >= 100) {
                 board[fromSquare] = 0;
-                console.log("Piece moved off edge and removed");
+                addLog("Piece moved off edge and removed");
                 return board;
             }
             
             if (board[toSquare] !== 0) {
-                console.log("Cannot move to occupied square");
+                addLog("Cannot move to occupied square");
                 return false;
             }
             
             board[toSquare] = board[fromSquare];
             board[fromSquare] = 0;
             
-            console.log(`Moved piece from ${fromSquare} to ${toSquare}`);
+            addLog(`Moved piece from square ${fromSquare} to ${toSquare}`);
             return board;
         }    
     },
@@ -199,22 +209,24 @@ const cardTypes = {
     buffer: {
         cardId: 8,
         name: "Buffer",
-        description: "Choose one of your polygon features. All empty squarees orthogonally adjacent to that polygon are filled with your features.",
+        description: "Choose one of your polygon features. All empty squares orthogonally adjacent to that polygon are filled with your features.",
         executionType: "placement",
         execute: function(board, startSquare, player, isValidMove) {
             polygonMembers = determinePolygon(board, startSquare, player);
-            console.log("Buffering polygon members:", polygonMembers);
             if (polygonMembers) {
+                let bufferedCount = 0;
                 polygonMembers.forEach(square => {
                     const neighbors = [square - 1, square + 1, square - 10, square + 10];
                     neighbors.forEach(neighbor => {
                         if (isValidMove(square, neighbor) && board[neighbor] === 0) {
                             board[neighbor] = player;
+                            bufferedCount++;
                         }
                     });
                 });
+                addLog(`Buffer: Added ${bufferedCount} features around polygon`);
             } else {
-                console.log("No valid polygon found for buffering.");
+                addLog("No valid polygon found for buffering");
                 return false;
             }
             return board;
@@ -227,6 +239,7 @@ const cardTypes = {
         description: "Return the board to its state previous to your opponent's last turn.",
         executionType: "immediate",
         execute: function(board, previousState, player) {
+            addLog("Board reverted to previous state");
             return [...previousState];
         }    
     },
@@ -238,10 +251,14 @@ const cardTypes = {
         executionType: "immediate",
         execute: function(board, previousState, player) {
             let newBoard = [...board];
+            let filledCount = 0;
 
             board.forEach((space, index) => {
-                fillSinks(newBoard, index, player);
+                if (fillSinks(newBoard, index, player)) {
+                    filledCount++;
+                }
             });
+            addLog(`Fill Sinks: Filled ${filledCount} squares`);
             return newBoard;
         }    
     },
@@ -257,6 +274,7 @@ const cardTypes = {
             board.forEach((space, index) => {
                 projectPieces(newBoard, index, chosenDirection, player);
             });
+            addLog(`Project: Moved all pieces ${chosenDirection}`);
             return newBoard;
         }    
     },
@@ -265,15 +283,15 @@ const cardTypes = {
         cardId: 12,
         name: "Spatial Join",
         description: "Add a piece to all of your line and polygon features.",
-        executionType: "placement",
+        executionType: "spatial-join",
         execute: function(board, startSquare, player, isValidMove) {
             if (!board.spatialJoinValidSquares || !board.spatialJoinValidSquares.has(startSquare)) {
-                console.log("Must place piece adjacent to a highlighted feature");
+                addLog("Must place piece adjacent to a highlighted feature");
                 return false;
             }
             
             if (board[startSquare] !== 0) {
-                console.log("Square already occupied");
+                addLog("Square already occupied");
                 return false;
             } 
 
@@ -281,7 +299,7 @@ const cardTypes = {
 
             board.spatialJoinValidSquares.delete(startSquare);
 
-            console.log(`Spatial Join: Placed piece at ${startSquare}`);
+            addLog(`Spatial Join: Placed piece at square ${startSquare}`);
             return board;
         }    
     },
@@ -294,7 +312,8 @@ const cardTypes = {
         execute: function(board, previousState, chosenLayerType, player) {
             let newBoard = [...board];
 
-            turnOffLayer(newBoard, chosenLayerType, player);
+            const removedCount = turnOffLayer(newBoard, chosenLayerType, player);
+            addLog(`Turn Off Layer: Removed ${removedCount} ${chosenLayerType}`);
 
             return newBoard;
         }       
@@ -307,7 +326,7 @@ const cardTypes = {
         executionType: "crunch",
         execute: function(board, startSquare, player, isValidMove) {
             pendingMoves.push(["crunch", player]);
-            console.log(`Crunch Time: Player ${player} will choose a card at end of game`);
+            addLog(`Crunch Time: Player ${player} will choose a card at end of game`);
             return board;
         }    
     },
@@ -321,28 +340,28 @@ const cardTypes = {
         execute: function(board, fromSquare, toSquare, player, isValidMove, initialPlacement) {
             if (initialPlacement) {
                 if (board[fromSquare] !== 0) {
-                    console.log("Must place on empty square");
+                    addLog("Must place on empty square");
                     return false;
                 }
                 board[fromSquare] = player;
                 board.hotspotAnchor = fromSquare;
-                console.log(`Hotspot: Placed anchor piece at ${fromSquare}`);
+                addLog(`Hotspot: Placed anchor piece at square ${fromSquare}`);
                 return board;
             } else {
                 if (board[fromSquare] !== player) {
-                    console.log("Must select one of your pieces");
+                    addLog("Must select one of your pieces");
                     return false;
                 }
                 
                 if (board[toSquare] !== 0) {
-                    console.log("Destination must be empty");
+                    addLog("Destination must be empty");
                     return false;
                 }
                 
                 board[toSquare] = board[fromSquare];
                 board[fromSquare] = 0;
                 
-                console.log(`Hotspot: Moved piece from ${fromSquare} to ${toSquare}`);
+                addLog(`Hotspot: Moved piece from square ${fromSquare} to ${toSquare}`);
                 return board;
             }
         }    
@@ -351,15 +370,19 @@ const cardTypes = {
     nearestNeighbor: {
         cardId: 16,
         name: "Nearest Neighbor",
-        description: "Choose an orthagonal direction. All empty spaces adjacent to one of your features in that direction are filled with your features.",
+        description: "Choose an orthogonal direction. All empty spaces adjacent to one of your features in that direction are filled with your features.",
         executionType: "choice-direction",
         execute: function(board, previousState, chosenDirection, player) {
             let newBoard = [...board];
             const originalBoard = [...board];
+            let filledCount = 0;
 
             board.forEach((space, index) => {
-                nearestNeighbor(newBoard, originalBoard, index, chosenDirection, player);
+                if (nearestNeighbor(newBoard, originalBoard, index, chosenDirection, player)) {
+                    filledCount++;
+                }
             });
+            addLog(`Nearest Neighbor: Filled ${filledCount} squares to the ${chosenDirection}`);
             return newBoard;
         }       
     },
@@ -371,12 +394,15 @@ const cardTypes = {
         pattern: [0, 2, 11, 13, 20, 22, 31, 33],
         executionType: "placement",
         execute: function(board, startSquare, player, isValidMove) {
+            let placedCount = 0;
             this.pattern.forEach(offset => {
                 const target = startSquare + offset;
                 if (isValidMove(startSquare, target, 3) && board[target] == 0) {
                     board[target] = player;
+                    placedCount++;
                 }
             });
+            addLog(`Tesselate: Placed ${placedCount} features`);
             return board;
         } 
     },
@@ -388,7 +414,7 @@ const cardTypes = {
         executionType: "choice-discard",
         execute: async function(board, startSquare, player, isValidMove) {
             if (discardPile.length === 0) {
-                console.log("No cards in discard pile");
+                addLog("No cards in discard pile");
                 return false;
             }
 
@@ -413,7 +439,7 @@ const cardTypes = {
             const opponentHand = opponent === 1 ? playerOneHand : playerTwoHand;
             
             if (opponentHand.length === 0) {
-                console.log("Opponent has no cards");
+                addLog("Opponent has no cards");
                 return board;
             }
             
@@ -424,7 +450,7 @@ const cardTypes = {
                 
                 if (action === 'use') {
                     const card = getCardById(cardId);
-                    console.log(`Using opponent's card: ${card.name}`);
+                    addLog(`Using opponent's card: ${card.name}`);
                     
                     const cardIndex = opponentHand.indexOf(cardId);
                     opponentHand.splice(cardIndex, 1);
@@ -432,7 +458,7 @@ const cardTypes = {
                     await selectCard(card);
                     
                 } else if (action === 'discard') {
-                    console.log(`Forcing opponent to discard card ${cardId}`);
+                    addLog(`Forcing opponent to discard card ${cardId}`);
                     
                     const cardIndex = opponentHand.indexOf(cardId);
                     opponentHand.splice(cardIndex, 1);
@@ -453,7 +479,7 @@ const cardTypes = {
         executionType: "choice-deck-5",
         execute: async function(board, startSquare, player, isValidMove) {
             if (remainingDeck.length === 0) {
-                console.log("No cards in remaining deck");
+                addLog("No cards in remaining deck");
                 return board;
             };
 
@@ -461,7 +487,7 @@ const cardTypes = {
 
             if (chosenCardId) {
                 pendingMoves.push(["modelBuilder", [player, chosenCardId]]);
-                console.log(`Model Builder: Card ${chosenCardId} queued for player ${player} at end of game`);
+                addLog(`Model Builder: Card ${chosenCardId} queued for player ${player} at end of game`);
             }
 
             return board;
@@ -479,8 +505,9 @@ const cardTypes = {
                     const target = startSquare + this.pattern[0];
                     if (isValidMove(startSquare, target) && board[target] != player) {
                         board[target] = player;
+                        addLog(`Data Validation: Flipped square ${startSquare} to Player ${player}`);
                     } else {
-                        console.log("Invalid move, try again");
+                        addLog("Invalid move, try again");
                         return false;
                 };
                 return board;
@@ -510,8 +537,6 @@ function determinePolygon(board, startSquare, player) {
 
     const visited = new Set();
     const polygonMembers = [];
-
-    console.log("Polygon members:", polygonMembers);
 
     function floodFill(square) {
         if (visited.has(square) || square < 0 || square >= 100) {
@@ -587,12 +612,11 @@ function determineLine(board, startSquare, player) {
 
 function fillSinks(newBoard, square, player) {
     if (newBoard[square] != 0) {
-        return;
+        return false;
     }
 
     const neighbors = [square - 1, square + 1, square - 10, square + 10];
     let surroundingCount = 0;
-
 
     neighbors.forEach(neighbor => {
         if (!isValidMove(square, neighbor)) {
@@ -604,7 +628,9 @@ function fillSinks(newBoard, square, player) {
 
     if (surroundingCount === 4) {
         newBoard[square] = player;
+        return true;
     }
+    return false;
 }
 
 function interpolateFill(newBoard, originalBoard, square, player) {
@@ -619,7 +645,9 @@ function interpolateFill(newBoard, originalBoard, square, player) {
 
     if (surroundingCount >= 3) {
         newBoard[square] = player;
+        return true;
     }
+    return false;
 }
 
 function projectPieces(newBoard, square, direction) {
@@ -646,29 +674,30 @@ function projectPieces(newBoard, square, direction) {
                 newBoard[square - 1] = piece;
             }
             break;
-        
     }
     
-    newBoard[piece] = 0;
+    newBoard[square] = 0;
 }
 
-function nearestNeighbor(newBoard, square, direction, player) {
+function nearestNeighbor(newBoard, originalBoard, square, direction, player) {
     let piece = originalBoard[square];
 
     if (piece != player) {
-        return;
+        return false;
     }
     let targetSquare;
-        switch(direction) {
-            case "North": targetSquare = square - 10; break;
-            case "South": targetSquare = square + 10; break;
-            case "East": targetSquare = square + 1; break;
-            case "West": targetSquare = square - 1; break;
-        }
+    switch(direction) {
+        case "North": targetSquare = square - 10; break;
+        case "South": targetSquare = square + 10; break;
+        case "East": targetSquare = square + 1; break;
+        case "West": targetSquare = square - 1; break;
+    }
 
     if (isValidMove(square, targetSquare) && originalBoard[targetSquare] == 0) {
         newBoard[targetSquare] = player;
+        return true;
     }
+    return false;
 }
 
 function turnOffLayer(newBoard, layerType, player) {
@@ -698,24 +727,29 @@ function turnOffLayer(newBoard, layerType, player) {
         }
     });
 
+    let removedCount = 0;
     switch(layerType) {
         case "Polygons":
             allPolygons.forEach(square => {
                 newBoard[square] = 0;
+                removedCount++;
             });
             break;
         case "Lines":
             allLines.forEach(square => {
                 newBoard[square] = 0;
+                removedCount++;
             });
             break;
         case "Points":
             remainingPoints.forEach(square => {
                 newBoard[square] = 0;
+                removedCount++;
             });
             break;
         default:
-            console.log("Invalid layer type selected.");
+            addLog("Invalid layer type selected");
     }
-
+    
+    return removedCount;
 }

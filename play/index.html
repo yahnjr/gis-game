@@ -18,6 +18,7 @@
 
         #main-game-area {
             display: grid;
+            grid-template-columns: 1fr auto;
             grid-template-rows: auto 1fr auto;
             height: 100%;
             gap: 15px;
@@ -28,6 +29,7 @@
             justify-content: space-between;
             align-items: flex-start;
             gap: 10px;
+            grid-column: 1;
         }
 
         #opponent-hand-container {
@@ -54,6 +56,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            grid-column: 1;
         }
 
         #game-board {
@@ -91,6 +94,7 @@
             justify-content: space-between;
             align-items: flex-end;
             gap: 10px;
+            grid-column: 1;
         }
 
         #player-hand-container {
@@ -111,6 +115,70 @@
             font-weight: bold;
             background-color: #f0f0f0;
             flex-shrink: 0;
+        }
+
+        #right-panel {
+            grid-column: 2;
+            grid-row: 1 / 4;
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #current-card-display {
+            border: 2px solid black;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            min-height: 200px;
+        }
+
+        #current-card-display h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+        }
+
+        #current-card-display p {
+            margin: 0;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        #current-card-display.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+        }
+
+        #activity-feed {
+            border: 2px solid black;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #activity-feed h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+        }
+
+        #activity-log {
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 5px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
         }
 
         .card-container {
@@ -235,19 +303,6 @@
                 font-size: 0.6rem;
             }
         }
-
-        .ground-truth-instructions {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 1rem;
-            z-index: 1001;
-        }
     </style>
 </head>
 <body>
@@ -264,6 +319,16 @@
         <div id='bottom-area'>
             <div id='player-hand-container'></div>
             <div id="remaining-deck">Deck</div>
+        </div>
+
+        <div id='right-panel'>
+            <div id='current-card-display' class='empty'>
+                No card selected
+            </div>
+            <div id='activity-feed'>
+                <h3>Activity Feed</h3>
+                <div id='activity-log'></div>
+            </div>
         </div>
     </div>
 

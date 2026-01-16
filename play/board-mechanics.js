@@ -1,8 +1,6 @@
 const urlParams = new URLSearchParams(window.location.search);
 const gameId = urlParams.get('gameId') || '12345678';
 const playerId = parseInt(urlParams.get('playerId')) || 1;
-console.log(`Game ID: ${gameId}`);
-console.log(`Player ID: ${playerId}`);
 
 let db;
 let currentState = Array(100).fill(0);
@@ -25,8 +23,38 @@ let hotspotPhase = "initial";
 firebase.initializeApp(firebaseConfig);
 db = firebase.database();
 
+function addLog(message) {
+    const logContainer = document.getElementById('activity-log');
+    const logEntry = document.createElement('div');
+    logEntry.classList.add('log-entry');
+    logEntry.innerText = message;
+    logContainer.prepend(logEntry);
+    
+    const allEntries = logContainer.querySelectorAll('.log-entry');
+    if (allEntries.length > 50) {
+        allEntries[allEntries.length - 1].remove();
+    }
+}
+
+function displayCurrentCard(card) {
+    const cardDisplay = document.getElementById('current-card-display');
+    if (!card) {
+        cardDisplay.className = 'empty';
+        cardDisplay.innerHTML = 'No card selected';
+        return;
+    }
+    
+    cardDisplay.className = '';
+    cardDisplay.innerHTML = `
+        <h3>${card.name}</h3>
+        <p>${card.description}</p>
+    `;
+}
+
 async function selectCard(card) {
     selectedCard = card;
+    displayCurrentCard(card);
+    addLog(`Player ${currentPlayer} selected ${card.name}`);
 
     if (card.executionType === "immediate") {
         let result = card.execute(currentState, previousState, currentPlayer);
@@ -63,28 +91,52 @@ async function selectCard(card) {
         let result = await card.execute(currentState, null, currentPlayer, isValidMove);
         endTurn(card);
     } else if (card.executionType === "ground-truth") {
-        pplaysRemaining = card.movesRemaining;
+        playsRemaining = card.movesRemaining;
         groundTruthFirstClick = null;
-        showGroundTruthInstructions();
     } else if (card.executionType === "spatial-join") {
         initializeSpatialJoin();
     } else if (card.executionType === "hotspot") {
         playsRemaining = card.movesRemaining;
         hotspotFirstClick = null;
-        hostpotPhase = "initial";
-        showHotspotInstructions();
+        hotspotPhase = "initial";
     }
-
-    console.log(`Selected card: ${selectedCard}`);
 }
 
 function setupFirebaseListeners() {
     const gameStatesRef = db.ref('game-states');
 
-    gameStatesRef.orderByChild('gameId').equalTo(gameId).on('value', (snapshot) => {
+    gameStatesRef.orderByChild('gameId').equalTo(gameId).once('value', (snapshot) => {
         const data = snapshot.val();
 
-        console.log(`data: ${data}`);
+        if (data) {
+            const gameStateKey = Object.keys(data)[0];
+            const gameData = data[gameStateKey];
+
+            if (playerId === 1 && gameData.playerOneJoined) {
+                alert('Player 1 slot is already taken!');
+                addLog('Attempted to join as Player 1 but slot was taken');
+                return;
+            }
+            if (playerId === 2 && gameData.playerTwoJoined) {
+                alert('Player 2 slot is already taken!');
+                addLog('Attempted to join as Player 2 but slot was taken');
+                return;
+            }
+
+            const updateData = {};
+            if (playerId === 1) {
+                updateData.playerOneJoined = true;
+            } else if (playerId === 2) {
+                updateData.playerTwoJoined = true;
+            }
+            
+            gameStatesRef.child(gameStateKey).update(updateData);
+            addLog(`Player ${playerId} joined the game`);
+        }
+    });
+
+    gameStatesRef.orderByChild('gameId').equalTo(gameId).on('value', (snapshot) => {
+        const data = snapshot.val();
 
         if (data) {
             const gameStateKey = Object.keys(data)[0];
@@ -109,11 +161,6 @@ function setupFirebaseListeners() {
                 remainingDeck = JSON.parse(gameData.remainingDeck);
 
                 pendingMoves = JSON.parse(gameData.pendingMoves) || [];
-
-                console.log(`Player One Hand: ${playerOneHand}`);
-                console.log(`Player Two Hand: ${playerTwoHand}`);
-
-                console.log('Current board state:', currentState);
 
                 setBoardState(currentState, playerOneColor, playerTwoColor);
                 
@@ -167,8 +214,6 @@ function dealCards(playerId) {
     const handContainer = document.getElementById('player-hand-container');
     handContainer.innerHTML = '';
 
-    console.log("Dealing cards:", playerHand);
-
     playerHand.forEach(cardId => {
         const cardContainer = createCardElement(cardId);
         cardContainer.addEventListener('click', function() {
@@ -194,7 +239,7 @@ function dealCards(playerId) {
 function createCardElement(cardId) {
     const card = getCardById(parseInt(cardId));
     if (!card) {
-        console.log(`Card with ID ${cardId} not found.`);
+        addLog(`Card with ID ${cardId} not found`);
         return;
     }
 
@@ -281,9 +326,9 @@ function executeCard(clickedSquare) {
             if (currentState[clickedSquare] !== 0) {
                 groundTruthFirstClick = clickedSquare;
                 document.getElementById(`board-space${clickedSquare}`).classList.add('highlight-change');
-                console.log(`Selected piece at ${clickedSquare} to move`);
+                addLog(`Selected piece at square ${clickedSquare} to move`);
             } else {
-                console.log("No piece at that location");
+                addLog("No piece at that location");
             }
         } else {
             const fromSquare = groundTruthFirstClick;
@@ -297,16 +342,14 @@ function executeCard(clickedSquare) {
                 currentState = result;
                 setBoardState(currentState, playerOneColor, playerTwoColor);
                 playsRemaining--;
-                updateGroundTruthInstructions();
                 
                 groundTruthFirstClick = null;
                 
                 if (playsRemaining === 0) {
-                    removeGroundTruthInstructions();
                     endTurn(card);
                 }
             } else {
-                console.log("Invalid move, try again");
+                addLog("Invalid move, try again");
                 groundTruthFirstClick = null;
             }
         }
@@ -320,14 +363,16 @@ function executeCard(clickedSquare) {
             currentState = result;
             setBoardState(currentState, playerOneColor, playerTwoColor);
             playsRemaining--;
-            updateSpatialJoinInstructions();
             
             if (playsRemaining === 0) {
-                removeSpatialJoinInstructions();
+                document.querySelectorAll('.board-space').forEach(space => {
+                    space.classList.remove('highlight-change');
+                });
+                delete currentState.spatialJoinValidSquares;
                 endTurn(card);
             }
         } else {
-            console.log("Invalid placement");
+            addLog("Invalid placement");
         }
         return;
     }
@@ -340,16 +385,15 @@ function executeCard(clickedSquare) {
                 currentState = result;
                 setBoardState(currentState, playerOneColor, playerTwoColor);
                 hotspotPhase = "moving";
-                updateHotspotInstructions();
             }
         } else if (hotspotPhase === "moving") {
             if (hotspotFirstClick === null) {
                 if (currentState[clickedSquare] === currentPlayer) {
                     hotspotFirstClick = clickedSquare;
                     document.getElementById(`board-space${clickedSquare}`).classList.add('highlight-change');
-                    console.log(`Selected piece at ${clickedSquare} to move`);
+                    addLog(`Selected piece at square ${clickedSquare} to move`);
                 } else {
-                    console.log("Must select one of your pieces");
+                    addLog("Must select one of your pieces");
                 }
             } else {
                 const fromSquare = hotspotFirstClick;
@@ -363,21 +407,27 @@ function executeCard(clickedSquare) {
                     currentState = result;
                     setBoardState(currentState, playerOneColor, playerTwoColor);
                     playsRemaining--;
-                    updateHotspotInstructions();
                     
                     hotspotFirstClick = null;
                     
                     if (playsRemaining === 0) {
                         if (validateHotspotPolygon()) {
-                            removeHotspotInstructions();
+                            document.querySelectorAll('.board-space').forEach(space => {
+                                space.classList.remove('highlight-change');
+                            });
+                            delete currentState.hotspotAnchor;
                             endTurn(card);
                         } else {
                             alert('Pieces must form a polygon with the anchor piece. Turn cancelled.');
-                            removeHotspotInstructions();
+                            addLog('Hotspot validation failed - turn cancelled');
+                            document.querySelectorAll('.board-space').forEach(space => {
+                                space.classList.remove('highlight-change');
+                            });
+                            delete currentState.hotspotAnchor;
                         }
                     }
                 } else {
-                    console.log("Invalid move, try again");
+                    addLog("Invalid move, try again");
                     hotspotFirstClick = null;
                 }
             }
@@ -389,8 +439,6 @@ function executeCard(clickedSquare) {
         playsRemaining = card.numberOfPlays || 1;
     }
 
-    console.log(`Remaining plays: ${playsRemaining}`);
-
     let result = card.execute(currentState, clickedSquare, currentPlayer, isValidMove);
 
     if (result != false) {
@@ -398,18 +446,17 @@ function executeCard(clickedSquare) {
         setBoardState(currentState, playerOneColor, playerTwoColor);
         playsRemaining--;
         
-        console.log(`Current discard pile: ${discardPile}`);
-        
         if (currentState && playsRemaining === 0) {
             endTurn(card);
         }
     } else {
-        console.log("Move was invalid, try again.");
+        addLog("Move was invalid, try again");
     }
 }
 
 function switchPlayer() {
     currentPlayer = currentPlayer === 1 ? 2 : 1;
+    addLog(`Switched to Player ${currentPlayer}'s turn`);
     dealCards(playerId);
 }
 
@@ -419,6 +466,8 @@ function endTurn(card) {
     currentHand.splice(cardIndex, 1);
     lastPlayedCard = card.cardId;
     discardPile.push(card.cardId);
+    addLog(`Player ${currentPlayer} played ${card.name}`);
+    displayCurrentCard(null);
     switchPlayer();
     updateFirebase();
 
@@ -446,9 +495,9 @@ function updateFirebase() {
                 remainingDeck: JSON.stringify(remainingDeck),
                 pendingMoves: JSON.stringify(pendingMoves)
             }).then(() => {
-                console.log('Game state updated in Firebase');
+                addLog('Game state updated');
             }).catch((error) => {
-                console.error('Error updating Firebase:', error);
+                addLog('Error updating game state: ' + error);
             });
         }
     });
@@ -464,29 +513,6 @@ function highlightChanges(newState, oldState) {
             const gameSpace = document.getElementById(`board-space${i}`);
             gameSpace.classList.add('highlight-change');
         }
-    }
-}
-
-function showGroundTruthInstructions() {
-    const instruction = document.createElement('div');
-    instruction.classList.add('special-instructions');
-    instruction.id = 'ground-truth-instruction';
-    instruction.innerText = `Ground Truth: ${playsRemaining} moves remaining. Click piece, then destination.`;
-    
-    document.body.appendChild(instruction);
-}
-
-function updateGroundTruthInstructions() {
-    const instruction = document.getElementById('ground-truth-instruction');
-    if (instruction) {
-        instruction.innerText = `Ground Truth: ${playsRemaining} moves remaining. Click piece, then destination.`;
-    }
-}
-
-function removeGroundTruthInstructions() {
-    const instruction = document.getElementById('ground-truth-instruction');
-    if (instruction) {
-        instruction.remove();
     }
 }
 
@@ -511,7 +537,7 @@ function createChoiceModal(choiceType) {
             const button = document.createElement('button');
             button.innerText = option;
             button.addEventListener('click', function() {
-                console.log(`Chosen ${choiceType}: ${option}`);
+                addLog(`Chosen ${choiceType}: ${option}`);
                 modalOverlay.remove();
                 resolve(option); 
             });
@@ -542,6 +568,7 @@ function createDiscardChoiceModal() {
             const selectButton = document.createElement('button');
             selectButton.innerText = 'Select This Card';
             selectButton.addEventListener('click', function() {
+                addLog(`Selected card from discard pile`);
                 modalOverlay.remove();
                 resolve(firstCardId);
             });
@@ -584,6 +611,7 @@ function createDeckChoiceModal(numberOfCards) {
             const selectButton = document.createElement('button');
             selectButton.innerText = 'Select This Card';
             selectButton.addEventListener('click', function() {
+                addLog(`Selected card from deck`);
                 modalOverlay.remove();
                 resolve(firstCardId);
             });
@@ -629,6 +657,7 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
             const useButton = document.createElement('button');
             useButton.innerText = 'Use This Card';
             useButton.addEventListener('click', function() {
+                addLog(`Using opponent's card`);
                 modalOverlay.remove();
                 resolve({ cardId: firstCardId, action: 'use'});
             });
@@ -636,6 +665,7 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
             const discardButton = document.createElement('button');
             discardButton.innerText = 'Discard This Card';
             discardButton.addEventListener('click', function() {
+                addLog(`Forcing opponent to discard card`);
                 modalOverlay.remove();
                 resolve({ cardId: firstCardId, action: 'discard'});
             });
@@ -661,7 +691,6 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
 }
 
 function initializeSpatialJoin() {
-    // Find all polygons and lines for the current player
     const visited = new Set();
     const features = [];
     
@@ -681,19 +710,18 @@ function initializeSpatialJoin() {
     });
     
     if (features.length === 0) {
-        console.log("No line or polygon features found");
+        addLog("No line or polygon features found");
         endTurn(selectedCard);
         return;
     }
     
-    // Find valid adjacent squares for each feature
     const validSquares = new Set();
     
     features.forEach(feature => {
         feature.squares.forEach(square => {
             const neighbors = feature.type === 'polygon' 
-                ? [square - 1, square + 1, square - 10, square + 10] // Orthogonal only
-                : [square - 1, square + 1, square - 9, square + 9, square - 10, square - 11, square + 10, square + 11]; // Include diagonal
+                ? [square - 1, square + 1, square - 10, square + 10]
+                : [square - 1, square + 1, square - 9, square + 9, square - 10, square - 11, square + 10, square + 11];
             
             neighbors.forEach(neighbor => {
                 if (isValidMove(square, neighbor) && currentState[neighbor] === 0) {
@@ -703,95 +731,16 @@ function initializeSpatialJoin() {
         });
     });
     
-    // Highlight all features
     features.forEach(feature => {
         feature.squares.forEach(square => {
             document.getElementById(`board-space${square}`).classList.add('highlight-change');
         });
     });
     
-    // Store valid squares in the board object
     currentState.spatialJoinValidSquares = validSquares;
     playsRemaining = features.length;
     
-    showSpatialJoinInstructions(features.length);
-}
-
-function showSpatialJoinInstructions(numFeatures) {
-    const instruction = document.createElement('div');
-    instruction.classList.add('special-instructions');
-    instruction.id = 'spatial-join-instruction';
-    instruction.innerText = `Spatial Join: Add to ${playsRemaining} highlighted feature(s). Click adjacent empty square.`;
-    
-    document.body.appendChild(instruction);
-}
-
-function updateSpatialJoinInstructions() {
-    const instruction = document.getElementById('spatial-join-instruction');
-    if (instruction) {
-        instruction.innerText = `Spatial Join: Add to ${playsRemaining} highlighted feature(s). Click adjacent empty square.`;
-    }
-}
-
-function removeSpatialJoinInstructions() {
-    const instruction = document.getElementById('spatial-join-instruction');
-    if (instruction) {
-        instruction.remove();
-    }
-    document.querySelectorAll('.board-space').forEach(space => {
-        space.classList.remove('highlight-change');
-    });
-    
-    delete currentState.spatialJoinValidSquares;
-}
-
-function showHotspotInstructions() {
-    const instruction = document.createElement('div');
-    instruction.classList.add('special-instructions');
-    instruction.id = 'hotspot-instruction';
-    const text = document.createElement('div');
-    text.innerText = hotspotPhase === "initial" 
-        ? "Hotspot: Place anchor piece on empty square"
-        : `Hotspot: ${playsRemaining} moves remaining. Click piece, then destination.`;
-    
-    instruction.appendChild(text);
-    
-    if (hotspotPhase === "moving") {
-        const finishButton = document.createElement('button');
-        finishButton.innerText = 'Finish Early';
-        finishButton.style.marginTop = '10px';
-        finishButton.addEventListener('click', function() {
-            if (validateHotspotPolygon()) {
-                removeHotspotInstructions();
-                endTurn(selectedCard);
-            } else {
-                alert('Pieces must form a polygon with the anchor piece');
-            }
-        });
-        instruction.appendChild(finishButton);
-    }
-    
-    document.body.appendChild(instruction);
-}
-
-function updateHotspotInstructions() {
-    removeHotspotInstructions();
-    showHotspotInstructions();
-}
-
-function removeHotspotInstructions() {
-    const instruction = document.getElementById('hotspot-instruction');
-    if (instruction) {
-        instruction.remove();
-    }
-    
-    // Remove highlights
-    document.querySelectorAll('.board-space').forEach(space => {
-        space.classList.remove('highlight-change');
-    });
-    
-    // Clean up
-    delete currentState.hotspotAnchor;
+    addLog(`Spatial Join: ${features.length} feature(s) found`);
 }
 
 function validateHotspotPolygon() {
@@ -800,32 +749,32 @@ function validateHotspotPolygon() {
     const polygon = determinePolygon(currentState, currentState.hotspotAnchor, currentPlayer);
     
     if (polygon && polygon.length >= 4) {
-        console.log("Valid polygon formed!");
+        addLog("Valid polygon formed!");
         return true;
     }
     
-    console.log("Does not form a valid polygon");
+    addLog("Does not form a valid polygon");
     return false;
 }
 
 async function beginEndGame() {
-    console.log("Beginning end game sequence...");
+    addLog("Beginning end game sequence...");
     
     if (pendingMoves.length > 0) {
-        console.log("Processing pending moves:", pendingMoves);
+        addLog(`Processing ${pendingMoves.length} pending moves`);
         await processPendingMoves();
     }
 
     const playerOneCount = currentState.filter(space => space === 1).length;
     const playerTwoCount = currentState.filter(space => space === 2).length;
 
-    console.log(`Final Score - Player One: ${playerOneCount}, Player Two: ${playerTwoCount}`);
+    addLog(`Final Score - Player One: ${playerOneCount}, Player Two: ${playerTwoCount}`);
 
     const winner = playerOneCount > playerTwoCount ? 'Player One Wins!' :
                    playerTwoCount > playerOneCount ? 'Player Two Wins!' :
                    'It\'s a Tie!';
     
-    console.log(winner);
+    addLog(winner);
 
     const modalOverlay = document.createElement('div');
     modalOverlay.id = 'board-overlay';
@@ -852,7 +801,7 @@ async function beginEndGame() {
 }
 
 async function processPendingMoves() {
-    console.log("Processing all pending moves...");
+    addLog("Processing all pending moves...");
     
     for (const move of pendingMoves) {
         const moveType = move[0];
@@ -861,7 +810,7 @@ async function processPendingMoves() {
             const player = move[1][0];
             const cardId = move[1][1];
             
-            console.log(`Processing Model Builder for Player ${player} with card ${cardId}`);
+            addLog(`Processing Model Builder for Player ${player} with card ${cardId}`);
             
             const card = getCardById(cardId);
             if (card) {
@@ -871,7 +820,7 @@ async function processPendingMoves() {
         } else if (moveType === 'crunch') {
             const player = move[1];
             
-            console.log(`Processing Crunch Time for Player ${player}`);
+            addLog(`Processing Crunch Time for Player ${player}`);
             
             const chosenCardId = await createDeckChoiceModal(3);
             if (chosenCardId) {
@@ -889,7 +838,7 @@ async function processPendingMoves() {
 
 async function executeEndGameCard(card, player) {
     return new Promise((resolve) => {
-        console.log(`Player ${player} executing card: ${card.name}`);
+        addLog(`Player ${player} executing card: ${card.name}`);
         
         const modalOverlay = document.createElement('div');
         modalOverlay.id = 'board-overlay';
