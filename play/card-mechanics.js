@@ -1,4 +1,24 @@
 const cardTypes = {
+    firstTurn: {
+        cardId: 99,
+        name: "Player's First Turn",
+        description: "Add ten features anywhere on the board.",
+        pattern: [0],
+        numberOfPlays: 10,
+        executionType: "placement",
+        execute: function(board, startSquare, player, isValidMove) {
+                const target = startSquare + this.pattern[0];
+                if (isValidMove(startSquare, target) && board[target] == 0) {
+                    board[target] = player;
+                    addLog(`Opening Moves: Placed feature at square ${startSquare}`);
+                } else {
+                    addLog("Invalid move, try again");
+                    return false;
+            };
+            return board;
+        }    
+    },
+    
     createFeatures: {
         cardId: 1,
         name: "Create Features",
@@ -432,14 +452,19 @@ const cardTypes = {
     collaboration: {
         cardId: 19,
         name: "Collaboration",
-        description: "Choose one of your opponent's cards to reveal. Choose whether to use it for yourself or force a discard.",
+        description: "Choose one of your opponent's cards to reveal. Choose whether to use it for yourself or force a discard. If the opposing player is out of cards, use the top card from the remaining deck.",
         executionType: "choice-opponent-card",
         execute: async function(board, startSquare, player, isValidMove) {
             const opponent = player === 1 ? 2 : 1;
             const opponentHand = opponent === 1 ? playerOneHand : playerTwoHand;
             
             if (opponentHand.length === 0) {
-                addLog("Opponent has no cards");
+                addLog("Opponent has no cards, using top card from remaining deck");
+                if (remainingDeck.length != 0) {
+                    const topCard = remainingDeck.pop();
+                    opponentHand.push(topCard);
+                }
+
                 return board;
             }
             
@@ -676,7 +701,12 @@ function projectPieces(newBoard, square, direction) {
             break;
     }
     
-    newBoard[square] = 0;
+    if (isValidMove(square, targetSquare)) {
+        newBoard[targetSquare] = piece;
+        newBoard[square] = 0;
+    } else {
+        newBoard[square] = 0;
+    }
 }
 
 function nearestNeighbor(newBoard, originalBoard, square, direction, player) {

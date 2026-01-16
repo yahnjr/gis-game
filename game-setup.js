@@ -1,82 +1,145 @@
 function createGame(playerOneColor, numberOfCards) {
-            console.log("Starting game with color:", playerOneColor, "and number of cards:", numberOfCards);
+    console.log("Starting game with color:", playerOneColor, "and number of cards:", numberOfCards);
 
-            const gameId = Math.random().toString(36).substring(2, 10);
-            console.log("Game ID:", gameId);
+    const gameId = Math.random().toString(36).substring(2, 7);
+    console.log("Game ID:", gameId);
 
-            let remainingDeck = Array.from({ length: 20 }, (_, i) => i + 1);
-            remainingDeck = shuffleArray(remainingDeck);
+    let remainingDeck = Array.from({ length: 20 }, (_, i) => i + 1);
+    remainingDeck = shuffleArray(remainingDeck);
 
-            let playerOneHand = [];
-            let playerTwoHand = [];
+    let playerOneHand = [];
+    let playerTwoHand = [];
+    
+    for (let i = 0; i < numberOfCards; i++) {
+        playerOneHand.push(remainingDeck.pop());
+        playerTwoHand.push(remainingDeck.pop());
+    }
+
+    playerOneHand.push(99);
+    playerTwoHand.push(99);
+
+    gameStatesRef.child(`game-${gameId}`).set({
+        gameId: gameId,
+        currentPlayer: 1,
+        discardPile: JSON.stringify([]),
+        gameState: JSON.stringify(Array(100).fill(0)),
+        previousState: JSON.stringify(Array(100).fill(0)),
+        lastPlayedCard: null,
+        playerOneColor: playerOneColor,
+        playerTwoColor: "rgba(0, 0, 255, 1)",
+        playerOneJoined: false,
+        playerTwoJoined: false,
+        playerOneHand: JSON.stringify(playerOneHand),
+        playerTwoHand: JSON.stringify(playerTwoHand),
+        playerOnePlayedFirstTurn: false,
+        playerTwoPlayedFirstTurn: false,
+        remainingDeck: JSON.stringify(remainingDeck),
+        pendingMoves: JSON.stringify([]),
+        gameLog: JSON.stringify([])
+    }).then(() => {
+        console.log("Game created successfully!");
+        alert(`Game created! Game ID: ${gameId}\nShare this ID with Player 2`);
+        window.location.href = `play/index.html?gameId=${gameId}&playerId=1`;
+    }).catch((error) => {
+        console.error('Error creating game:', error);
+        alert('Failed to create game. Please try again.');
+    });
+}
+
+function playAgain(gameId, numberOfCards) {
+    let remainingDeck = Array.from({ length: 20 }, (_, i) => i + 1);
+    remainingDeck = shuffleArray(remainingDeck);
+
+    let playerOneHand = [];
+    let playerTwoHand = [];
+
+    for (let i = 0; i < numberOfCards; i++) {
+        playerOneHand.push(remainingDeck.pop());
+        playerTwoHand.push(remainingDeck.pop());
+    }
+    
+    playerOneHand.push(99);
+    playerTwoHand.push(99);
+    
+    gameStatesRef.orderByChild('gameId').equalTo(gameId).once('value', (snapshot) => {
+        const data = snapshot.val();
+        
+        if (data) {
+            const gameStateKey = Object.keys(data)[0];
+            const existingGameData = data[gameStateKey];
             
-            for (let i = 0; i < numberOfCards; i++) {
-                playerOneHand.push(remainingDeck.pop());
-                playerTwoHand.push(remainingDeck.pop());
-            }
-
-            gameStatesRef.child(`game-${gameId}`).set({
-                gameId: gameId,
+            gameStatesRef.child(gameStateKey).update({
                 currentPlayer: 1,
                 discardPile: JSON.stringify([]),
                 gameState: JSON.stringify(Array(100).fill(0)),
                 previousState: JSON.stringify(Array(100).fill(0)),
                 lastPlayedCard: null,
-                playerOneColor: playerOneColor,
-                playerTwoColor: "rgba(0, 0, 255, 1)",
-                playerOneJoined: false,
-                playerTwoJoined: false,
+                playerOneJoined: existingGameData.playerOneJoined || false,
+                playerTwoJoined: existingGameData.playerTwoJoined || false,
                 playerOneHand: JSON.stringify(playerOneHand),
                 playerTwoHand: JSON.stringify(playerTwoHand),
+                playerOnePlayedFirstTurn: false,
+                playerTwoPlayedFirstTurn: false,
                 remainingDeck: JSON.stringify(remainingDeck),
-                pendingMoves: JSON.stringify([])
+                pendingMoves: JSON.stringify([]),
+                gameLog: JSON.stringify([])
             }).then(() => {
-                console.log("Game created successfully!");
-                alert(`Game created! Game ID: ${gameId}\nShare this ID with Player 2`);
-                window.location.href = `play/index.html?gameId=${gameId}&playerId=1`;
+                console.log("Restarting game successfully!");
+                window.location.reload();
             }).catch((error) => {
-                console.error('Error creating game:', error);
-                alert('Failed to create game. Please try again.');
+                console.error('Error restarting game:', error);
+                alert('Failed to restart game. Please try again.');
             });
         }
+    });
+}
 
-        function joinGame(gameId, playerTwoColor) {
-            console.log("Joining game:", gameId, "with color:", playerTwoColor);
+function joinGame(gameId, playerTwoColor) {
+    console.log("Joining game:", gameId, "with color:", playerTwoColor);
 
-            gameStatesRef.child(`game-${gameId}`).once('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    const gameData = snapshot.val();
-                    
-                    gameStatesRef.child(`game-${gameId}`).update({
-                        playerTwoColor: playerTwoColor
-                    }).then(() => {
-                        console.log("Joined game successfully!");
-                        window.location.href = `play/index.html?gameId=${gameId}&playerId=2`;
-                    }).catch((error) => {
-                        console.error('Error joining game:', error);
-                        alert('Failed to join game. Please try again.');
-                    });
-                } else {
-                    console.log("Game not found");
-                    document.getElementById('join-error').style.display = 'block';
-                }
+    gameStatesRef.child(`game-${gameId}`).once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const gameData = snapshot.val();
+            
+            gameStatesRef.child(`game-${gameId}`).update({
+                playerTwoColor: playerTwoColor
+            }).then(() => {
+                console.log("Joined game successfully!");
+                window.location.href = `play/index.html?gameId=${gameId}&playerId=2`;
             }).catch((error) => {
-                console.error('Error checking game:', error);
-                alert('Error checking game. Please try again.');
+                console.error('Error joining game:', error);
+                alert('Failed to join game. Please try again.');
             });
+        } else {
+            console.log("Game not found");
+            document.getElementById('join-error').style.display = 'block';
         }
+    }).catch((error) => {
+        console.error('Error checking game:', error);
+        alert('Error checking game. Please try again.');
+    });
+}
 
-        function shuffleArray(array) {
-            let currentIndex = array.length, randomIndex;
+function shuffleArray(array) {
+    let currentIndex = array.length, randomIndex;
 
-            while (currentIndex !== 0) {
-                randomIndex = Math.floor(Math.random() * currentIndex);
-                currentIndex--;
+    while (currentIndex !== 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
 
-                [array[currentIndex], array[randomIndex]] = [
-                    array[randomIndex], array[currentIndex]
-                ];
-            }
+        [array[currentIndex], array[randomIndex]] = [
+            array[randomIndex], array[currentIndex]
+        ];
+    }
 
-            return array;
-        }
+    return array;
+}
+
+function hexToRgba(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const rgbaColor = `rgba(${r}, ${g}, ${b}, 1)`;
+    
+    return rgbaColor;
+}
