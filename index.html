@@ -3,62 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="styles/gis-battle.svg" type="image/svg+xml">
     <title>GIS Battle!</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-        }
-        button {
-            margin: 10px;
-            padding: 15px 30px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 30px;
-            border: 2px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-        }
-        .modal input,
-        .modal label {
-            margin: 10px;
-            display: inline-block;
-        }
-        .modal > div {
-            margin: 15px 0;
-        }
-        #modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel='stylesheet' href='styles/start-style.css'>
 </head>
 <body>
-    <h1>GIS Battle!</h1>
-    <button id="play-button">Start Game</button>
-    <button id="join-button">Join Existing Game</button>
-    <button id="browse-button">Browse GIS Toolkit</button>
+    <div id="bg-map"></div>
+
+    <div id="content-overlay">
+        <img id="logo" src="styles/gis-battle.svg" alt="GIS Battle Logo">
+        <h1>GIS Battle!</h1>
+        
+        <button id="play-button">Start Game</button>
+        <button id="join-button">Join Existing Game</button>
+        <button id="browse-button">Browse GIS Toolkit</button>
+
+        <img id="qr-code-gisbattle" src="styles/qr_code_gisbattle.png" alt="QR Code">
+    </div>
 
     <div id="modal-overlay"></div>
     
     <div id="start-game-modal" class="modal">
         <h2>Create New Game</h2>
+        <div>
+            <label for="game-map">Select Map:</label>
+            <select id="game-map" name="game-map">
+                <option value="world" selected>World Map</option>
+                <option value="new-york">New York</option>
+                <option value="custom">Custom Map</option>
+            </select>
+        </div>
+        
+        <div>
+            <label for="basemap-select">Basemap Style:</label>
+            <select id="basemap-select" name="basemap-select">
+            </select>
+        </div>
+        
+        <div id="board-map"></div>
+
         <div>
             <label for="player-color">Choose your color:</label>
             <input type="color" id="player-color" name="player-color" value="#ff00ff">
@@ -92,17 +77,143 @@
 
     <script src='https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js'></script>
     <script src='https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'></script>
-    <script src='play/firebase-config.js'></script>
-    <script src='game-setup.js'></script>
+    <script src='scripts/firebase-config.js'></script>
+    <script src='scripts/basemaps.js'></script>
+    <script src='scripts/game-setup.js'></script>
     <script>
         let db;
         firebase.initializeApp(firebaseConfig);
         db = firebase.database();
         const gameStatesRef = db.ref('game-states');
 
+        let bgMap;
+        let boardMap;
+        let bgMapSettings = {
+            coordinates: [20, 0],
+            zoom: 2,
+            basemap: 'imagery'
+        };
+        let currentMapSettings = {
+            coordinates: [20, 0],
+            zoom: 2,
+            basemap: 'imagery'
+        };
+
+        function initializeMap(containerId, mapSettings) {
+            let map = L.map(containerId, {
+                dragging: false,
+                zoomControl: false,
+                doubleClickZoom: false,
+                scrollWheelZoom: false,
+                touchZoom: false,
+                keyboard: false
+            }).setView(mapSettings.coordinates, mapSettings.zoom);
+
+            const basemapLayer = getBasemapLayer(mapSettings.basemap);
+            basemapLayer.addTo(map);
+
+            map.on('moveend', function() {
+                const center = map.getCenter();
+                mapSettings.coordinates = [center.lat, center.lng];
+                mapSettings.zoom = map.getZoom();
+            });
+
+            return map;
+        }
+
+        function updateMapFromPreset(preset) {
+            currentMapSettings = {
+                coordinates: [preset.lat, preset.lng],
+                zoom: preset.zoom,
+                basemap: preset.basemap
+            };
+            
+            if (boardMap) {
+                boardMap.setView([preset.lat, preset.lng], preset.zoom);
+            }
+        }
+
+        function enableMapControls(map) {
+            if (map) {
+                map.dragging.enable();
+                map.scrollWheelZoom.enable();
+                map.doubleClickZoom.enable();
+                map.touchZoom.enable();
+                map.addControl(L.control.zoom());
+            }
+        }
+
+        function disableMapControls(map) {
+            if (map) {
+                map.dragging.disable();
+                map.scrollWheelZoom.disable();
+                map.doubleClickZoom.disable();
+                map.touchZoom.disable();
+                if (map.zoomControl) {
+                    map.removeControl(map.zoomControl);
+                }
+            }
+        }
+
+        bgMap = initializeMap('bg-map', bgMapSettings);
+        
+        function populateBasemapSelector() {
+            const selector = document.getElementById('basemap-select');
+            const basemapKeys = getBasemapKeys();
+            
+            basemapKeys.forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = getBasemapName(key);
+                if (key === 'imagery') {
+                    option.selected = true;
+                }
+                selector.appendChild(option);
+            });
+        }
+
+        document.getElementById('player-color').value = getRandomBrightColor();
+        document.getElementById('player-two-color').value = getRandomBrightColor();
+        
+        populateBasemapSelector();
+
         document.getElementById('play-button').onclick = function() {
             document.getElementById('start-game-modal').style.display = 'block';
             document.getElementById('modal-overlay').style.display = 'block';
+            
+            setTimeout(() => {
+                if (boardMap) {
+                    boardMap.remove();
+                }
+                boardMap = initializeMap('board-map', currentMapSettings);
+                updateMapFromPreset(mapPresets['world']);
+            }, 100);
+        };
+        
+        document.getElementById('game-map').onchange = function() {
+            const selectedMap = this.value;
+            
+            if (selectedMap === 'custom') {
+                enableMapControls(boardMap);
+            } else {
+                disableMapControls(boardMap);
+                updateMapFromPreset(mapPresets[selectedMap]);
+            }
+        };
+        
+        document.getElementById('basemap-select').onchange = function() {
+            const selectedBasemap = this.value;
+            currentMapSettings.basemap = selectedBasemap;
+            
+            if (boardMap) {
+                boardMap.remove();
+            }
+            boardMap = initializeMap('board-map', currentMapSettings);
+            
+            const selectedMapPreset = document.getElementById('game-map').value;
+            if (selectedMapPreset === 'custom') {
+                enableMapControls(boardMap);
+            }
         };
         
         document.getElementById('cancel-start-game').onclick = function() {
@@ -130,7 +241,7 @@
             
             const rgbaColor = hexToRgba(playerOneColor);
             
-            createGame(rgbaColor, numberOfCards);
+            createGame(rgbaColor, numberOfCards, currentMapSettings.coordinates, currentMapSettings.zoom, currentMapSettings.basemap);
         };
         
         document.getElementById('confirm-join-game').onclick = function() {
@@ -152,7 +263,12 @@
             document.getElementById('join-game-modal').style.display = 'none';
             document.getElementById('modal-overlay').style.display = 'none';
             document.getElementById('join-error').style.display = 'none';
+            
+            if (boardMap) {
+                boardMap.remove();
+                boardMap = null;
+            }
         }
-        </script>
+    </script>
 </body>
 </html>

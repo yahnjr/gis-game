@@ -3,8 +3,12 @@ const gameId = urlParams.get('gameId') || '12345678';
 const playerId = parseInt(urlParams.get('playerId')) || 1;
 
 let db;
+let map;
 let currentState = Array(100).fill(0);
 let previousState = Array(100).fill(0);
+let mapCoordinates = [0, 0];
+let mapZoom = 1;
+let mapBasemap = 'imagery';
 let playerOneColor;
 let playerTwoColor;
 let playerOneHand = [];
@@ -23,6 +27,9 @@ let hotspotFirstClick = null;
 let hotspotPhase = "initial";
 let gameLog = [];
 let isListenerSetup = false;
+let isMapInitialized = false;
+
+document.getElementById('game-id-display').textContent = `Game: ${gameId}`;
 
 firebase.initializeApp(firebaseConfig);
 db = firebase.database();
@@ -56,22 +63,69 @@ function updateLogDisplay() {
     if (allEntries.length > 50) {
         gameLog = gameLog.slice(-50);
     }
+
+    scrollActivityLogToBottom();
 }
 
-function displayCurrentCard(card) {
-    const cardDisplay = document.getElementById('current-card-display');
+function scrollActivityLogToBottom() {
+    const activityLog = document.getElementById('activity-log');
+    if (activityLog) {
+        activityLog.scrollTop = activityLog.scrollHeight;
+    }
+}
+
+function updateDeckIndicators() {
+    const discardIndicator = document.getElementById('discard-pile');
+    const deckIndicator = document.getElementById('remaining-deck');
+    
+    if (discardIndicator && discardPile) {
+        discardIndicator.textContent = discardPile.length;
+    }
+    
+    if (deckIndicator && remainingDeck) {
+        deckIndicator.textContent = remainingDeck.length;
+    }
+}
+
+displayCurrentCard = function(card) {
+    const cardDisplay = document.getElementById('current-card-mini');
+    if (!cardDisplay) return;
+    
     if (!card) {
-        cardDisplay.className = 'empty';
-        cardDisplay.innerHTML = 'No card selected';
+        cardDisplay.innerHTML = `
+            <div class='card-container-inner'>
+                <div class='card-back'>
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" stroke-width="3"/>
+                        <path d="M30,50 L50,30 L70,50 L50,70 Z" fill="currentColor"/>
+                    </svg>
+                    <h3>GIS Battle</h3>
+                </div>
+                <div class='card-front'>
+                    <h3>No Card</h3>
+                    <p>Select a card</p>
+                </div>
+            </div>
+        `;
         return;
     }
     
-    cardDisplay.className = '';
     cardDisplay.innerHTML = `
-        <h3>${card.name}</h3>
-        <p>${card.description}</p>
+        <div class='card-container-inner'>
+            <div class='card-back'>
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" stroke-width="3"/>
+                    <path d="M30,50 L50,30 L70,50 L50,70 Z" fill="currentColor"/>
+                </svg>
+                <h3>GIS Battle</h3>
+            </div>
+            <div class='card-front'>
+                <h3>${card.name}</h3>
+                <p>${card.description}</p>
+            </div>
+        </div>
     `;
-}
+};
 
 async function selectCard(card) {
     selectedCard = card;
@@ -181,6 +235,16 @@ function setupGameStateListener() {
                 currentState = JSON.parse(gameData.gameState);
                 currentPlayer = gameData.currentPlayer || 1;
 
+                mapCoordinates = JSON.parse(gameData.coordinates);
+                mapZoom = gameData.zoom;
+                mapBasemap = gameData.basemap;
+
+                if (!isMapInitialized && mapCoordinates && mapZoom && mapBasemap) {
+                    console.log('Initializing map with Firebase data:', { mapCoordinates, mapZoom, mapBasemap });
+                    buildBoard();
+                    isMapInitialized = true;
+                }
+
                 playerOneColor = gameData.playerOneColor;
                 playerTwoColor = gameData.playerTwoColor;
 
@@ -213,7 +277,28 @@ function setupGameStateListener() {
 }
 
 function buildBoard() {
-    boardArea = document.getElementById('game-board');
+    console.log('Building board with coordinates:', mapCoordinates, 'zoom:', mapZoom, 'basemap:', mapBasemap);
+
+    if (map) {
+        map.remove();
+    }
+
+    map = L.map('map', { 
+        interactive: false, 
+        zoomControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        touchZoom: false,
+        keyboard: false,
+        boxZoom: false
+    }).setView(mapCoordinates, mapZoom);
+
+    const basemapLayer = getBasemapLayer(mapBasemap);
+    basemapLayer.addTo(map);
+
+    const boardArea = document.getElementById('game-board');
+    boardArea.innerHTML = '';
 
     for (let i = 0; i < 100; i++) {
         const boardSpace = document.createElement('div');
@@ -249,9 +334,15 @@ function setBoardState(currentState, playerOneColor, playerTwoColor){
     };
 }
 
-function updateTurnIndicator() {
+updateTurnIndicator = function() {
+    const turnIndicator = document.getElementById('turn-indicator');
     const playerHandContainer = document.getElementById('player-hand-container');
     let turnBlocker = document.getElementById('turn-blocker');
+    
+    if (turnIndicator) {
+        turnIndicator.textContent = `Player ${currentPlayer}'s Turn`;
+        turnIndicator.style.color = currentPlayer === playerId ? '#4CAF50' : '#ff9800';
+    }
     
     if (currentPlayer !== playerId) {
         if (!turnBlocker) {
@@ -269,7 +360,10 @@ function updateTurnIndicator() {
             turnBlocker.style.display = 'none';
         }
     }
-}
+    
+    updateDeckIndicators();
+};
+
 
 function dealCards(playerId) {
     const playerHand = playerId === 1 ? playerOneHand : playerTwoHand;
@@ -311,6 +405,8 @@ function dealCards(playerId) {
         
         opponentHandContainer.appendChild(cardContainer);
     });
+
+    updateDeckIndicators();
 }
 
 function createCardElement(cardId) {
@@ -537,6 +633,8 @@ function executeCard(clickedSquare) {
                 playsRemaining--;
                 
                 groundTruthFirstClick = null;
+
+                updateFirebase();
                 
                 if (playsRemaining === 0) {
                     endTurn(card);
@@ -556,6 +654,8 @@ function executeCard(clickedSquare) {
             currentState = result;
             setBoardState(currentState, playerOneColor, playerTwoColor);
             playsRemaining--;
+
+            updateFirebase();
             
             if (playsRemaining === 0) {
                 document.querySelectorAll('.board-space').forEach(space => {
@@ -577,6 +677,7 @@ function executeCard(clickedSquare) {
             if (result !== false) {
                 currentState = result;
                 setBoardState(currentState, playerOneColor, playerTwoColor);
+                updateFirebase();
                 hotspotPhase = "moving";
             }
         } else if (hotspotPhase === "moving") {
@@ -602,6 +703,8 @@ function executeCard(clickedSquare) {
                     playsRemaining--;
                     
                     hotspotFirstClick = null;
+
+                    updateFirebase();
                     
                     if (playsRemaining === 0) {
                         if (validateHotspotPolygon()) {
@@ -638,6 +741,8 @@ function executeCard(clickedSquare) {
         currentState = result;
         setBoardState(currentState, playerOneColor, playerTwoColor);
         playsRemaining--;
+
+        updateFirebase();
         
         if (currentState && playsRemaining === 0) {
             endTurn(card);
@@ -651,6 +756,7 @@ function switchPlayer() {
     currentPlayer = currentPlayer === 1 ? 2 : 1;
     addLog(`Switched to Player ${currentPlayer}'s turn`);
     dealCards(playerId);
+    updateTurnIndicator();
 }
 
 function endTurn(card) {
@@ -680,9 +786,7 @@ function endTurn(card) {
     
     if (playerOneHand.length === 0 && playerTwoHand.length === 0) {
         beginEndGame();
-    }
-
-    if (currentHand.length === 0) {
+    } else if (currentHand.length === 0) {
         addLog(`Player ${currentPlayer} has no cards left, skipping turn`);
         endTurn({ cardId: -1, name: 'No Card' });
     }
@@ -703,7 +807,7 @@ function updateFirebase() {
                 playerOneHand: JSON.stringify(playerOneHand),
                 playerTwoHand: JSON.stringify(playerTwoHand),
                 discardPile: JSON.stringify(discardPile),
-                lastPlayedCard: lastPlayedCard,
+                lastPlayedCard: lastPlayedCard || 0,
                 remainingDeck: JSON.stringify(remainingDeck),
                 pendingMoves: JSON.stringify(pendingMoves),
                 playerOnePlayedFirstTurn: playerOnePlayedFirstTurn,
@@ -1256,4 +1360,7 @@ window.onload = function() {
     buildBoard();
     setBoardState(currentState, playerOneColor, playerTwoColor);
     setupFirebaseListeners();
+    updateTurnIndicator();
+    updateDeckIndicators();
+    scrollActivityLogToBottom();
 }
