@@ -86,16 +86,12 @@ body {
 }
 
 .deck-indicator {
-    width: 40px;
-    height: 40px;
+    width: 60px;
+    height: 80px;
     margin: 0 auto;
-    background: #444;
-    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    font-size: 18px;
 }
 
 #middle-area {
@@ -108,12 +104,11 @@ body {
     padding: 10px;
 }
 
-/* This container ensures both Map and Board stay locked together */
 #map, #game-board {
     position: absolute;
     width: 100%;
     height: 100%;
-    max-width: 85vh; /* Constraints based on height to prevent overlap */
+    max-width: 85vh;
     max-height: 85vh; 
     aspect-ratio: 1 / 1;
 }
@@ -121,7 +116,7 @@ body {
 #game-board {
     display: grid;
     grid-template-columns: repeat(10, 1fr);
-    grid-template-rows: repeat(10, 1fr); /* Added to ensure vertical alignment */
+    grid-template-rows: repeat(10, 1fr);
     z-index: 999;
     pointer-events: none;
 }
@@ -131,8 +126,6 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2);
     position: relative;
     pointer-events: auto;
-    
-    /* Center the pieces */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -159,15 +152,27 @@ body {
     max-height: 30vh;
     overflow: hidden;
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .hand-section {
-    margin-bottom: 8px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .hand-section:last-child {
     margin-bottom: 0;
+}
+
+#opponent-section .hand-container {
+    justify-content: flex-end;
+}
+
+#opponent-section .hand-label {
+    text-align: right;
 }
 
 .hand-label {
@@ -179,10 +184,12 @@ body {
 
 .hand-container {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     overflow-x: auto;
-    padding: 4px 0;
-    min-height: 70px;
+    overflow-y: hidden;
+    padding: 4px;
+    flex: 1;
+    align-items: flex-start;
 }
 
 .hand-container::-webkit-scrollbar {
@@ -198,66 +205,37 @@ body {
     min-width: 60px;
     width: 60px;
     height: 80px;
-    perspective: 1000px;
     cursor: pointer;
     flex-shrink: 0;
 }
 
-.card-container-inner {
+.card-back {
     width: 100%;
     height: 100%;
-    position: relative;
-    transition: transform 0.6s;
-    transform-style: preserve-3d;
-}
-
-.card-container-inner.flip {
-    transform: rotateY(180deg);
-}
-
-.card-front, .card-back {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    border-radius: 4px;
-    padding: 6px;
+    border-radius: 6px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
-    font-size: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    border: 2px solid #555;
-}
-
-.card-front {
-    background: white;
-    color: #333;
-}
-
-.card-back {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    border: 2px solid rgba(255, 255, 255, 0.2);
     background: #667eea;
     color: white;
-    transform: rotateY(180deg);
 }
 
-.card-back svg {
-    width: 40px;
-    height: 40px;
-    margin-bottom: 4px;
+.card-back img {
+    width: 35px;
+    height: 35px;
+    margin-bottom: 6px;
+    filter: brightness(0) invert(1);
 }
 
-.card-front h3, .card-back h3 {
-    font-size: 9px;
-    margin-bottom: 4px;
-}
-
-.card-front p {
-    font-size: 7px;
-    line-height: 1.2;
+.card-back h3 {
+    font-size: 10px;
+    margin-bottom: 0;
+    font-weight: bold;
 }
 
 #player-section {
@@ -327,29 +305,6 @@ body {
     height: 280px;
 }
 
-.magnified-card .card-front,
-.magnified-card .card-back {
-    font-size: 14px;
-    padding: 20px;
-}
-
-.magnified-card .card-back svg {
-    width: 80px;
-    height: 80px;
-    margin-bottom: 10px;
-}
-
-.magnified-card .card-front h3,
-.magnified-card .card-back h3 {
-    font-size: 18px;
-    margin-bottom: 10px;
-}
-
-.magnified-card .card-front p {
-    font-size: 12px;
-    line-height: 1.4;
-}
-
 .action-button, .cancel-button {
     padding: 12px 30px;
     font-size: 16px;
@@ -406,6 +361,51 @@ body {
 
 .highlighted-card {
     box-shadow: 0 0 12px 4px rgba(255, 215, 0, 0.9);
+}
+
+.deck-container {
+    position: relative;
+    width: 60px;
+    height: 80px;
+}
+
+.stacked-card {
+    position: absolute;
+    width: 60px;
+    height: 80px;
+}
+
+.magnified-card-display {
+    background-color: white;
+    color: #333;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.magnified-card-title {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.magnified-card-description {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.turn-indicator-active {
+    color: #4CAF50;
+}
+
+.turn-indicator-opponent {
+    color: #ff9800;
+}
+
+.nav-button-hidden {
+    visibility: hidden;
+}
+
+.nav-button-visible {
+    visibility: visible;
 }
 
 @media (max-width: 600px) {

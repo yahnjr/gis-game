@@ -16,7 +16,8 @@ let playerTwoHand = [];
 let playerOnePlayedFirstTurn = false;
 let playerTwoPlayedFirstTurn = false;
 let discardPile = [];
-let lastPlayedCard = 0;
+let lastPlayedCard = 99;
+let lastPlayedCardPlayer = 1;
 let remainingDeck = [];
 let currentPlayer = 1;
 let selectedCard;
@@ -63,27 +64,71 @@ function updateLogDisplay() {
     if (allEntries.length > 50) {
         gameLog = gameLog.slice(-50);
     }
-
-    scrollActivityLogToBottom();
-}
-
-function scrollActivityLogToBottom() {
-    const activityLog = document.getElementById('activity-log');
-    if (activityLog) {
-        activityLog.scrollTop = activityLog.scrollHeight;
-    }
 }
 
 function updateDeckIndicators() {
     const discardIndicator = document.getElementById('discard-pile');
     const deckIndicator = document.getElementById('remaining-deck');
     
-    if (discardIndicator && discardPile) {
-        discardIndicator.textContent = discardPile.length;
+    if (discardIndicator) {
+        discardIndicator.innerHTML = '';
+        discardIndicator.classList.add('deck-container');
+        
+        const numCards = discardPile.length;
+        const maxDisplay = 5;
+        const cardsToShow = Math.min(numCards, maxDisplay);
+        
+        for (let i = 0; i < cardsToShow; i++) {
+            const discardItem = discardPile[numCards - cardsToShow + i];
+            const playerColor = discardItem.player === 1 ? playerOneColor : playerTwoColor;
+            
+            const cardEl = document.createElement('div');
+            cardEl.classList.add('card-back', 'stacked-card');
+            cardEl.style.backgroundColor = playerColor;
+            cardEl.style.left = (i * 2) + 'px';
+            cardEl.style.top = '0px';
+            cardEl.style.zIndex = i;
+            
+            const img = document.createElement('img');
+            img.src = '../styles/gis-battle.svg';
+            img.alt = 'GIS Battle Logo';
+            
+            const label = document.createElement('h3');
+            label.textContent = 'GIS Battle';
+            
+            cardEl.appendChild(img);
+            cardEl.appendChild(label);
+            discardIndicator.appendChild(cardEl);
+        }
     }
     
-    if (deckIndicator && remainingDeck) {
-        deckIndicator.textContent = remainingDeck.length;
+    if (deckIndicator) {
+        deckIndicator.innerHTML = '';
+        deckIndicator.classList.add('deck-container');
+        
+        const numCards = remainingDeck.length;
+        const maxDisplay = 5;
+        const cardsToShow = Math.min(numCards, maxDisplay);
+        
+        for (let i = 0; i < cardsToShow; i++) {
+            const cardEl = document.createElement('div');
+            cardEl.classList.add('card-back', 'stacked-card');
+            cardEl.style.backgroundColor = '#667eea';
+            cardEl.style.left = (i * 2) + 'px';
+            cardEl.style.top = '0px';
+            cardEl.style.zIndex = i;
+            
+            const img = document.createElement('img');
+            img.src = '../styles/gis-battle.svg';
+            img.alt = 'GIS Battle Logo';
+            
+            const label = document.createElement('h3');
+            label.textContent = 'GIS Battle';
+            
+            cardEl.appendChild(img);
+            cardEl.appendChild(label);
+            deckIndicator.appendChild(cardEl);
+        }
     }
 }
 
@@ -91,48 +136,114 @@ displayCurrentCard = function(card) {
     const cardDisplay = document.getElementById('current-card-mini');
     if (!cardDisplay) return;
     
-    if (!card) {
-        cardDisplay.innerHTML = `
-            <div class='card-container-inner'>
-                <div class='card-back'>
-                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" stroke-width="3"/>
-                        <path d="M30,50 L50,30 L70,50 L50,70 Z" fill="currentColor"/>
-                    </svg>
-                    <h3>GIS Battle</h3>
-                </div>
-                <div class='card-front'>
-                    <h3>No Card</h3>
-                    <p>Select a card</p>
-                </div>
-            </div>
-        `;
-        return;
+    cardDisplay.innerHTML = '';
+    
+    if (card) {
+        const cardBack = document.createElement('div');
+        cardBack.classList.add('card-back');
+        cardBack.style.backgroundColor = currentPlayer === 1 ? playerOneColor : playerTwoColor;
+        
+        const img = document.createElement('img');
+        img.src = '../styles/gis-battle.svg';
+        img.alt = 'GIS Battle Logo';
+        
+        const label = document.createElement('h3');
+        label.textContent = card.name || 'GIS Battle';
+        
+        cardBack.appendChild(img);
+        cardBack.appendChild(label);
+        cardDisplay.appendChild(cardBack);
+    } else {
+        const lastCard = getCardById(lastPlayedCard);
+        if (lastCard) {
+            const cardBack = document.createElement('div');
+            cardBack.classList.add('card-back');
+            cardBack.style.backgroundColor = lastPlayedCardPlayer === 1 ? playerOneColor : playerTwoColor;
+            cardBack.style.cursor = 'pointer';
+            
+            const img = document.createElement('img');
+            img.src = '../styles/gis-battle.svg';
+            img.alt = 'GIS Battle Logo';
+            
+            const label = document.createElement('h3');
+            label.textContent = lastCard.name || 'GIS Battle';
+            
+            cardBack.appendChild(img);
+            cardBack.appendChild(label);
+            
+            cardBack.addEventListener('click', function() {
+                showLastPlayedCardMagnified();
+            });
+            
+            cardDisplay.appendChild(cardBack);
+        }
+    }
+};
+
+function showLastPlayedCardMagnified() {
+    const lastCard = getCardById(lastPlayedCard);
+    if (!lastCard) return;
+    
+    const existingOverlay = document.getElementById('board-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
     }
     
-    cardDisplay.innerHTML = `
-        <div class='card-container-inner'>
-            <div class='card-back'>
-                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" stroke-width="3"/>
-                    <path d="M30,50 L50,30 L70,50 L50,70 Z" fill="currentColor"/>
-                </svg>
-                <h3>GIS Battle</h3>
-            </div>
-            <div class='card-front'>
-                <h3>${card.name}</h3>
-                <p>${card.description}</p>
-            </div>
-        </div>
-    `;
-};
+    const overlay = document.createElement('div');
+    overlay.id = 'board-overlay';
+    
+    const cardContainer = document.createElement('div');
+    cardContainer.className = 'card-selector-container';
+    
+    const magnifiedCard = document.createElement('div');
+    magnifiedCard.classList.add('magnified-card', 'magnified-card-display');
+    magnifiedCard.style.border = `3px solid ${lastPlayedCardPlayer === 1 ? playerOneColor : playerTwoColor}`;
+    
+    const cardTitle = document.createElement('h3');
+    cardTitle.classList.add('magnified-card-title');
+    cardTitle.innerText = lastCard.name;
+    
+    const cardDescription = document.createElement('p');
+    cardDescription.classList.add('magnified-card-description');
+    cardDescription.innerText = lastCard.description;
+    
+    magnifiedCard.appendChild(cardTitle);
+    magnifiedCard.appendChild(cardDescription);
+    
+    const cardWrapper = document.createElement('div');
+    cardWrapper.className = 'card-wrapper';
+    cardWrapper.appendChild(magnifiedCard);
+    
+    cardContainer.appendChild(cardWrapper);
+    overlay.appendChild(cardContainer);
+    
+    const closeButton = document.createElement('button');
+    closeButton.className = 'cancel-button';
+    closeButton.innerText = 'Close';
+    closeButton.addEventListener('click', function() {
+        overlay.remove();
+    });
+    
+    overlay.appendChild(closeButton);
+    
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            overlay.remove();
+        }
+    });
+    
+    document.body.appendChild(overlay);
+}
 
 async function selectCard(card) {
     selectedCard = card;
     displayCurrentCard(card);
     addLog(`Player ${currentPlayer} selected ${card.name}`);
 
-    if (card.executionType === "immediate") {
+    if (card.cardId === 99) {
+        playsRemaining = card.numberOfPlays || 1;
+        groundTruthFirstClick = null;
+    } else if (card.executionType === "immediate") {
         let result = card.execute(currentState, previousState, currentPlayer);
         if (result) {
             currentState = result;
@@ -188,16 +299,16 @@ function setupFirebaseListeners() {
             const gameStateKey = Object.keys(data)[0];
             const gameData = data[gameStateKey];
 
-            if (playerId === 1 && gameData.playerOneJoined) {
-                alert('Player 1 slot is already taken!');
-                window.location.href = '../index.html';
-                return;
-            }
-            if (playerId === 2 && gameData.playerTwoJoined) {
-                alert('Player 2 slot is already taken!');
-                window.location.href = '../index.html';
-                return;
-            }
+            // if (playerId === 1 && gameData.playerOneJoined) {
+            //     alert('Player 1 slot is already taken!');
+            //     window.location.href = '../index.html';
+            //     return;
+            // }
+            // if (playerId === 2 && gameData.playerTwoJoined) {
+            //     alert('Player 2 slot is already taken!');
+            //     window.location.href = '../index.html';
+            //     return;
+            // }
 
             const updateData = {};
             if (playerId === 1) {
@@ -255,7 +366,8 @@ function setupGameStateListener() {
                 playerTwoPlayedFirstTurn = gameData.playerTwoPlayedFirstTurn || false;
 
                 discardPile = JSON.parse(gameData.discardPile);
-                lastPlayedCard = gameData.lastPlayedCard;
+                lastPlayedCard = gameData.lastPlayedCard || 99;
+                lastPlayedCardPlayer = gameData.lastPlayedCardPlayer || 1;
                 remainingDeck = JSON.parse(gameData.remainingDeck);
 
                 pendingMoves = JSON.parse(gameData.pendingMoves) || [];
@@ -271,6 +383,7 @@ function setupGameStateListener() {
 
                 dealCards(playerId);
                 updateTurnIndicator();
+                displayCurrentCard(null);
             }
         }
     });
@@ -341,7 +454,8 @@ updateTurnIndicator = function() {
     
     if (turnIndicator) {
         turnIndicator.textContent = `Player ${currentPlayer}'s Turn`;
-        turnIndicator.style.color = currentPlayer === playerId ? '#4CAF50' : '#ff9800';
+        turnIndicator.classList.remove('turn-indicator-active', 'turn-indicator-opponent');
+        turnIndicator.classList.add(currentPlayer === playerId ? 'turn-indicator-active' : 'turn-indicator-opponent');
     }
     
     if (currentPlayer !== playerId) {
@@ -370,19 +484,10 @@ function dealCards(playerId) {
     const handContainer = document.getElementById('player-hand-container');
     handContainer.innerHTML = '';
 
-    const playerHasPlayedFirstTurn = playerId === 1 ? playerOnePlayedFirstTurn : playerTwoPlayedFirstTurn;
-
-    if (playerId === currentPlayer && !playerHasPlayedFirstTurn) {
-        const firstTurnCard = getCardById(99);
-        if (firstTurnCard) {
-            addLog(`Player ${playerId} must place 10 pieces anywhere on the board`);
-            selectCard(firstTurnCard);
-            return;
-        }
-    }
-
+    const currentPlayerColor = playerId === 1 ? playerOneColor : playerTwoColor;
+    
     playerHand.forEach(cardId => {
-        const cardContainer = createCardElement(cardId);
+        const cardContainer = createCardElement(cardId, currentPlayerColor);
         cardContainer.addEventListener('click', function() {
             if (currentPlayer !== playerId) {
                 alert('Please wait for your turn!');
@@ -398,18 +503,17 @@ function dealCards(playerId) {
     const opponentHandContainer = document.getElementById('opponent-hand-container');
     opponentHandContainer.innerHTML = '';
     const opponentHand = playerId === 1 ? playerTwoHand : playerOneHand;
+    const opponentColor = playerId === 1 ? playerTwoColor : playerOneColor;
 
     opponentHand.forEach((cardId) => {
-        const cardContainer = createCardElement(cardId);
-        cardContainer.querySelector('.card-container-inner').classList.add('flip');
-        
+        const cardContainer = createCardElement(cardId, opponentColor);
         opponentHandContainer.appendChild(cardContainer);
     });
 
     updateDeckIndicators();
 }
 
-function createCardElement(cardId) {
+function createCardElement(cardId, playerColor) {
     const card = getCardById(parseInt(cardId));
     if (!card) {
         addLog(`Card with ID ${cardId} not found`);
@@ -419,35 +523,30 @@ function createCardElement(cardId) {
     const cardContainer = document.createElement('div');
     cardContainer.classList.add('card-container');
     cardContainer.id = `card-${card.cardId}`;
-
-    const cardContainerInner = document.createElement('div');
-    cardContainerInner.classList.add('card-container-inner');
     
     const cardBack = document.createElement('div');
     cardBack.classList.add('card-back');
+    if (playerColor) {
+        cardBack.style.backgroundColor = playerColor;
+    }
+    
+    const cardBackImg = document.createElement('img');
+    cardBackImg.src = '../styles/gis-battle.svg';
+    cardBackImg.alt = 'GIS Battle Logo';
+    cardBack.appendChild(cardBackImg);
+    
     const cardBackTitle = document.createElement('h3');
     cardBackTitle.innerText = "GIS Battle";
     cardBack.appendChild(cardBackTitle);
-    
-    const cardFront = document.createElement('div');
-    cardFront.classList.add('card-front');
-    const cardTitle = document.createElement('h3');
-    cardTitle.innerText = card.name;
-    const cardDescription = document.createElement('p');
-    cardDescription.innerText = card.description;
 
-    cardFront.appendChild(cardTitle);
-    cardFront.appendChild(cardDescription);
-
-    cardContainerInner.appendChild(cardBack);
-    cardContainerInner.appendChild(cardFront);
-    cardContainer.appendChild(cardContainerInner);
+    cardContainer.appendChild(cardBack);
 
     return cardContainer;
 }
 
 function getCardById(cardId) {
-    return Object.values(cardTypes).find(card => card.cardId === cardId);
+    const numericId = parseInt(cardId);
+    return Object.values(cardTypes).find(card => card.cardId === numericId);
 }
 
 function showMagnifiedCard(card) {
@@ -530,16 +629,34 @@ function showCardSelector(cardArray, startIndex, context) {
     function updateDisplayedCard() {
         cardWrapper.innerHTML = '';
         const cardId = cardArray[currentIndex];
-        const magnifiedCard = createCardElement(cardId);
-        magnifiedCard.classList.add('magnified-card');
+        const card = getCardById(cardId);
+        
+        const magnifiedCard = document.createElement('div');
+        magnifiedCard.classList.add('magnified-card', 'magnified-card-display');
+        magnifiedCard.style.border = `3px solid ${currentPlayer === 1 ? playerOneColor : playerTwoColor}`;
+        
+        const cardTitle = document.createElement('h3');
+        cardTitle.classList.add('magnified-card-title');
+        cardTitle.innerText = card.name;
+        
+        const cardDescription = document.createElement('p');
+        cardDescription.classList.add('magnified-card-description');
+        cardDescription.innerText = card.description;
+        
+        magnifiedCard.appendChild(cardTitle);
+        magnifiedCard.appendChild(cardDescription);
         cardWrapper.appendChild(magnifiedCard);
 
         if (cardArray.length <= 1) {
-            prevButton.style.visibility = 'hidden';
-            nextButton.style.visibility = 'hidden';
+            prevButton.classList.add('nav-button-hidden');
+            nextButton.classList.add('nav-button-hidden');
+            prevButton.classList.remove('nav-button-visible');
+            nextButton.classList.remove('nav-button-visible');
         } else {
-            prevButton.style.visibility = 'visible';
-            nextButton.style.visibility = 'visible';
+            prevButton.classList.add('nav-button-visible');
+            nextButton.classList.add('nav-button-visible');
+            prevButton.classList.remove('nav-button-hidden');
+            nextButton.classList.remove('nav-button-hidden');
         }
     }
 
@@ -606,6 +723,26 @@ function executeCard(clickedSquare) {
     if (currentPlayer !== playerId) {
         alert('Please wait for your turn!');
         return;
+    }
+
+    if (!selectedCard) {
+        const hasPlayedFirstTurn = currentPlayer === 1 ? playerOnePlayedFirstTurn : playerTwoPlayedFirstTurn;
+        
+        if (!hasPlayedFirstTurn) {
+            const firstCard = getCardById(99);
+            if (firstCard) {
+                selectedCard = firstCard;
+                displayCurrentCard(firstCard);
+                playsRemaining = firstCard.numberOfPlays || 1;
+                addLog(`Player ${currentPlayer} auto-selected ${firstCard.name}`);
+            } else {
+                alert('First turn card not found!');
+                return;
+            }
+        } else {
+            alert('Please select a card first!');
+            return;
+        }
     }
     
     const card = selectedCard;
@@ -757,6 +894,7 @@ function switchPlayer() {
     addLog(`Switched to Player ${currentPlayer}'s turn`);
     dealCards(playerId);
     updateTurnIndicator();
+    displayCurrentCard(null);
 }
 
 function endTurn(card) {
@@ -764,11 +902,11 @@ function endTurn(card) {
     const cardIndex = currentHand.indexOf(card.cardId);
     currentHand.splice(cardIndex, 1);
     lastPlayedCard = card.cardId;
+    lastPlayedCardPlayer = currentPlayer;
     if (card.cardId !== 99) {
-        discardPile.push(card.cardId);
+        discardPile.push({ cardId: card.cardId, player: currentPlayer });
     }
     addLog(`Player ${currentPlayer} played ${card.name}`);
-    displayCurrentCard(null);
 
     if (card.cardId === 99) {
         if (currentPlayer === 1) {
@@ -807,7 +945,8 @@ function updateFirebase() {
                 playerOneHand: JSON.stringify(playerOneHand),
                 playerTwoHand: JSON.stringify(playerTwoHand),
                 discardPile: JSON.stringify(discardPile),
-                lastPlayedCard: lastPlayedCard || 0,
+                lastPlayedCard: lastPlayedCard,
+                lastPlayedCardPlayer: lastPlayedCardPlayer,
                 remainingDeck: JSON.stringify(remainingDeck),
                 pendingMoves: JSON.stringify(pendingMoves),
                 playerOnePlayedFirstTurn: playerOnePlayedFirstTurn,
@@ -874,7 +1013,8 @@ function createDiscardChoiceModal() {
             return;
         }
 
-        showCardSelector(discardPile, 0, 'discard');
+        const cardIds = discardPile.map(item => item.cardId);
+        showCardSelector(cardIds, 0, 'discard');
     });
 }
 
@@ -968,8 +1108,28 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
         function updateDisplayedCard() {
             cardWrapper.innerHTML = '';
             const cardId = opponentHand[currentIndex];
-            const magnifiedCard = createCardElement(cardId);
+            const card = getCardById(cardId);
+            
+            const magnifiedCard = document.createElement('div');
             magnifiedCard.classList.add('magnified-card');
+            magnifiedCard.style.backgroundColor = 'white';
+            magnifiedCard.style.color = '#333';
+            magnifiedCard.style.borderRadius = '8px';
+            magnifiedCard.style.padding = '20px';
+            magnifiedCard.style.border = `3px solid ${currentPlayer === 1 ? playerOneColor : playerTwoColor}`;
+            
+            const cardTitle = document.createElement('h3');
+            cardTitle.innerText = card.name;
+            cardTitle.style.fontSize = '18px';
+            cardTitle.style.marginBottom = '10px';
+            
+            const cardDescription = document.createElement('p');
+            cardDescription.innerText = card.description;
+            cardDescription.style.fontSize = '12px';
+            cardDescription.style.lineHeight = '1.4';
+            
+            magnifiedCard.appendChild(cardTitle);
+            magnifiedCard.appendChild(cardDescription);
             cardWrapper.appendChild(magnifiedCard);
 
             if (opponentHand.length <= 1) {
@@ -1362,5 +1522,4 @@ window.onload = function() {
     setupFirebaseListeners();
     updateTurnIndicator();
     updateDeckIndicators();
-    scrollActivityLogToBottom();
 }

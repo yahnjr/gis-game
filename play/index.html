@@ -10,18 +10,11 @@
     <link rel="stylesheet" href="../styles/play-style.css">
 </head>
 <body>
-    <div id="activity-log-section">
-        <div id="game-header">
-            <div id="turn-indicator">Player 1's Turn</div>
-            <div id="game-id-display">Game: 12345678</div>
-        </div>
-        <div id="activity-log"></div>
-    </div>
     
     <div id="board-area">
         <div id="top-controls">
             <div class="control-item">
-                <div class="control-label">Current Card</div>
+                <div class="control-label">Last Played Card</div>
                 <div id="current-card-mini" class="card-container">
                     <div class="card-container-inner">
                         <div class="card-back">
@@ -53,18 +46,26 @@
         </div>
     </div>
     
+    <div id="activity-log-section">
+        <div id="game-header">
+            <div id="turn-indicator">Player 1's Turn</div>
+            <div id="game-id-display">Game: 12345678</div>
+        </div>
+        <div id="activity-log"></div>
+    </div>
+
     <div id="cards-area">
+        <div class="hand-section" id="player-section">
+            <div class="hand-label">Your Hand</div>
+            <div id="player-hand-container" class="hand-container">
+                <div id="turn-blocker">
+                    <div>Opponent"s Turn</div>
+                </div>
+            </div>
+        </div>
         <div class="hand-section" id="opponent-section">
             <div class="hand-label">Opponent</div>
             <div id="opponent-hand-container" class="hand-container"></div>
-        </div>
-        <div class="hand-section" id="player-section">
-            <div class="hand-label">Your Hand</div>
-            <div id="turn-blocker">
-                <div>Opponent"s Turn</div>
-            </div>
-            <div id="player-hand-container" class="hand-container">
-            </div>
         </div>
     </div>
 

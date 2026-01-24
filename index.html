@@ -30,8 +30,6 @@
         <div>
             <label for="game-map">Select Map:</label>
             <select id="game-map" name="game-map">
-                <option value="world" selected>World Map</option>
-                <option value="new-york">New York</option>
                 <option value="custom">Custom Map</option>
             </select>
         </div>
@@ -257,6 +255,9 @@
             
             joinGame(gameId, rgbaColor);
         };
+
+        const presetSelect = document.getElementById("game-map");
+        populatePresetDropdown(presetSelect);
         
         function closeModals() {
             document.getElementById('start-game-modal').style.display = 'none';

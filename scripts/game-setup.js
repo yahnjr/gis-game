@@ -25,7 +25,8 @@ function createGame(playerOneColor, numberOfCards, coordinates, zoom, basemap) {
         discardPile: JSON.stringify([]),
         gameState: JSON.stringify(Array(100).fill(0)),
         previousState: JSON.stringify(Array(100).fill(0)),
-        lastPlayedCard: null,
+        lastPlayedCard: 99,
+        lastPlayedCardPlayer: 1,
         playerOneColor: playerOneColor,
         playerTwoColor: "rgba(0, 0, 255, 1)",
         playerOneJoined: false,
@@ -77,7 +78,8 @@ function playAgain(gameId, numberOfCards) {
                 discardPile: JSON.stringify([]),
                 gameState: JSON.stringify(Array(100).fill(0)),
                 previousState: JSON.stringify(Array(100).fill(0)),
-                lastPlayedCard: null,
+                lastPlayedCard: 99,
+                lastPlayedCardPlayer: 1,
                 playerOneJoined: existingGameData.playerOneJoined || false,
                 playerTwoJoined: existingGameData.playerTwoJoined || false,
                 playerOneHand: JSON.stringify(playerOneHand),
@@ -183,8 +185,3 @@ function hexToRgba(hex) {
     
     return rgbaColor;
 }
-
-const mapPresets = {
-    "world": { lat: 20, lng: 0, zoom: 2, basemap: 'imagery' },
-    "new-york": { lat: 40.7128, lng: -74.0060, zoom: 12, basemap: 'imagery' }
-};
