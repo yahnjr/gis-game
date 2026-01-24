@@ -70,6 +70,35 @@ body {
 .control-item {
     text-align: center;
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.end-turn-btn {
+    padding: 8px 16px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    display: none;
+    white-space: nowrap;
+}
+
+.end-turn-btn:hover {
+    background: #d32f2f;
+}
+
+.end-turn-btn:active {
+    background: #c62828;
+}
+
+.end-turn-btn.visible {
+    display: block;
 }
 
 .control-label {
@@ -83,6 +112,35 @@ body {
     height: 80px;
     margin: 0 auto;
     font-size: 8px;
+    position: relative;
+}
+
+.last-card-container {
+    position: relative;
+    width: 60px;
+    height: 80px;
+}
+
+.plays-remaining-indicator {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    width: 30px;
+}
+
+.play-circle {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid #dcdedc;
+    background: transparent;
+}
+
+.play-circle-active {
+    background: #131313;
 }
 
 .deck-indicator {
@@ -190,6 +248,11 @@ body {
     padding: 4px;
     flex: 1;
     align-items: flex-start;
+    flex-wrap: nowrap;
+}
+
+#player-section .hand-container {
+    gap: 0;
 }
 
 .hand-container::-webkit-scrollbar {
@@ -207,6 +270,53 @@ body {
     height: 80px;
     cursor: pointer;
     flex-shrink: 0;
+    margin-right: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.card-container:last-child {
+    margin-right: 0;
+}
+
+#player-section .card-container {
+    flex-grow: 1;
+    max-width: 60px;
+    margin-right: 8px;
+}
+
+#player-section .hand-container {
+    gap: 0;
+}
+
+#opponent-section .card-container {
+    flex-grow: 1;
+    max-width: 60px;
+    margin-right: 8px;
+}
+
+#opponent-section .hand-container {
+    gap: 0;
+}
+
+@media (max-width: 1000px) {
+    #player-section .card-container {
+        flex-grow: 0;
+        margin-right: -30px;
+    }
+    
+    #player-section .card-container:last-child {
+        margin-right: 0;
+    }
+    
+    #opponent-section .card-container {
+        flex-grow: 0;
+        margin-right: -30px;
+    }
+    
+    #opponent-section .card-container:last-child {
+        margin-right: 0;
+    }
 }
 
 .card-back {
@@ -230,6 +340,7 @@ body {
     height: 35px;
     margin-bottom: 6px;
     filter: brightness(0) invert(1);
+    flex-shrink: 0;
 }
 
 .card-back h3 {
@@ -238,11 +349,11 @@ body {
     font-weight: bold;
 }
 
-#player-section {
+#player-section, #opponent-section {
     position: relative;
 }
 
-#turn-blocker {
+.turn-blocker {
     position: absolute;
     top: 0;
     left: 0;

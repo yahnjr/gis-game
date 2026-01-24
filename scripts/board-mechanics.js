@@ -156,6 +156,9 @@ displayCurrentCard = function(card) {
     } else {
         const lastCard = getCardById(lastPlayedCard);
         if (lastCard) {
+            const cardContainer = document.createElement('div');
+            cardContainer.className = 'last-card-container';
+            
             const cardBack = document.createElement('div');
             cardBack.classList.add('card-back');
             cardBack.style.backgroundColor = lastPlayedCardPlayer === 1 ? playerOneColor : playerTwoColor;
@@ -175,7 +178,25 @@ displayCurrentCard = function(card) {
                 showLastPlayedCardMagnified();
             });
             
-            cardDisplay.appendChild(cardBack);
+            cardContainer.appendChild(cardBack);
+            
+            if (playsRemaining > 0) {
+                const indicatorContainer = document.createElement('div');
+                indicatorContainer.className = 'plays-remaining-indicator';
+                
+                for (let i = 0; i < (lastCard.numberOfPlays || 1); i++) {
+                    const circle = document.createElement('div');
+                    circle.className = 'play-circle';
+                    if (i < playsRemaining) {
+                        circle.classList.add('play-circle-active');
+                    }
+                    indicatorContainer.appendChild(circle);
+                }
+                
+                cardContainer.appendChild(indicatorContainer);
+            }
+            
+            cardDisplay.appendChild(cardContainer);
         }
     }
 };
@@ -239,6 +260,7 @@ async function selectCard(card) {
     selectedCard = card;
     displayCurrentCard(card);
     addLog(`Player ${currentPlayer} selected ${card.name}`);
+    updateEndTurnButtonVisibility();
 
     if (card.cardId === 99) {
         playsRemaining = card.numberOfPlays || 1;
@@ -299,16 +321,16 @@ function setupFirebaseListeners() {
             const gameStateKey = Object.keys(data)[0];
             const gameData = data[gameStateKey];
 
-            // if (playerId === 1 && gameData.playerOneJoined) {
-            //     alert('Player 1 slot is already taken!');
-            //     window.location.href = '../index.html';
-            //     return;
-            // }
-            // if (playerId === 2 && gameData.playerTwoJoined) {
-            //     alert('Player 2 slot is already taken!');
-            //     window.location.href = '../index.html';
-            //     return;
-            // }
+            if (playerId === 1 && gameData.playerOneJoined) {
+                alert('Player 1 slot is already taken!');
+                window.location.href = '../index.html';
+                return;
+            }
+            if (playerId === 2 && gameData.playerTwoJoined) {
+                alert('Player 2 slot is already taken!');
+                window.location.href = '../index.html';
+                return;
+            }
 
             const updateData = {};
             if (playerId === 1) {
@@ -368,6 +390,7 @@ function setupGameStateListener() {
                 discardPile = JSON.parse(gameData.discardPile);
                 lastPlayedCard = gameData.lastPlayedCard || 99;
                 lastPlayedCardPlayer = gameData.lastPlayedCardPlayer || 1;
+                playsRemaining = gameData.playsRemaining || 0;
                 remainingDeck = JSON.parse(gameData.remainingDeck);
 
                 pendingMoves = JSON.parse(gameData.pendingMoves) || [];
@@ -450,34 +473,55 @@ function setBoardState(currentState, playerOneColor, playerTwoColor){
 updateTurnIndicator = function() {
     const turnIndicator = document.getElementById('turn-indicator');
     const playerHandContainer = document.getElementById('player-hand-container');
-    let turnBlocker = document.getElementById('turn-blocker');
+    const playerSection = document.getElementById('player-section');
+    const opponentSection = document.getElementById('opponent-section');
+    let playerTurnBlocker = document.getElementById('player-turn-blocker');
+    let opponentTurnBlocker = document.getElementById('opponent-turn-blocker');
     
     if (turnIndicator) {
         turnIndicator.textContent = `Player ${currentPlayer}'s Turn`;
         turnIndicator.classList.remove('turn-indicator-active', 'turn-indicator-opponent');
         turnIndicator.classList.add(currentPlayer === playerId ? 'turn-indicator-active' : 'turn-indicator-opponent');
     }
+
+    if (!playerTurnBlocker) {
+        playerTurnBlocker = createBlocker('player');
+        playerSection.appendChild(playerTurnBlocker);
+    }
+
+    if (!opponentTurnBlocker) {
+        opponentTurnBlocker = createBlocker('opponent');
+        opponentSection.appendChild(opponentTurnBlocker);
+    }
     
     if (currentPlayer !== playerId) {
-        if (!turnBlocker) {
-            turnBlocker = document.createElement('div');
-            turnBlocker.id = 'turn-blocker';
-            turnBlocker.innerHTML = '<div>Opponent\'s Turn</div>';
-            turnBlocker.addEventListener('click', function() {
-                alert('Please wait for your turn!');
-            });
-            playerHandContainer.parentElement.appendChild(turnBlocker);
-        }
-        turnBlocker.style.display = 'flex';
+        playerTurnBlocker.style.display = 'flex';
+        opponentTurnBlocker.style.display = 'none';
     } else {
-        if (turnBlocker) {
-            turnBlocker.style.display = 'none';
-        }
+        playerTurnBlocker.style.display = 'none';
+        opponentTurnBlocker.style.display = 'flex';
     }
     
     updateDeckIndicators();
+    updateEndTurnButtonVisibility();
 };
 
+function createBlocker(targetHand) {
+    const blocker = document.createElement('div');
+    blocker.classList.add('turn-blocker');
+    let blockerId;
+    let blockerText;
+
+    if (targetHand === 'player') {
+        blocker.id = 'player-turn-blocker';
+        blocker.innerText = 'Opponent\'s Turn';
+    } else if (targetHand === 'opponent') {
+        blocker.id = 'opponent-turn-blocker';
+        blocker.innerText = 'Opponent\'s Hand';
+    }
+
+    return blocker;
+}
 
 function dealCards(playerId) {
     const playerHand = playerId === 1 ? playerOneHand : playerTwoHand;
@@ -487,7 +531,7 @@ function dealCards(playerId) {
     const currentPlayerColor = playerId === 1 ? playerOneColor : playerTwoColor;
     
     playerHand.forEach(cardId => {
-        const cardContainer = createCardElement(cardId, currentPlayerColor);
+        const cardContainer = createCardElement(cardId, currentPlayerColor, true);
         cardContainer.addEventListener('click', function() {
             if (currentPlayer !== playerId) {
                 alert('Please wait for your turn!');
@@ -506,14 +550,14 @@ function dealCards(playerId) {
     const opponentColor = playerId === 1 ? playerTwoColor : playerOneColor;
 
     opponentHand.forEach((cardId) => {
-        const cardContainer = createCardElement(cardId, opponentColor);
+        const cardContainer = createCardElement(cardId, opponentColor, false);
         opponentHandContainer.appendChild(cardContainer);
     });
 
     updateDeckIndicators();
 }
 
-function createCardElement(cardId, playerColor) {
+function createCardElement(cardId, playerColor, isPlayerHand = false) {
     const card = getCardById(parseInt(cardId));
     if (!card) {
         addLog(`Card with ID ${cardId} not found`);
@@ -536,7 +580,7 @@ function createCardElement(cardId, playerColor) {
     cardBack.appendChild(cardBackImg);
     
     const cardBackTitle = document.createElement('h3');
-    cardBackTitle.innerText = "GIS Battle";
+    cardBackTitle.innerText = isPlayerHand ? (card.name || 'GIS Battle') : "GIS Battle";
     cardBack.appendChild(cardBackTitle);
 
     cardContainer.appendChild(cardBack);
@@ -947,6 +991,7 @@ function updateFirebase() {
                 discardPile: JSON.stringify(discardPile),
                 lastPlayedCard: lastPlayedCard,
                 lastPlayedCardPlayer: lastPlayedCardPlayer,
+                playsRemaining: playsRemaining,
                 remainingDeck: JSON.stringify(remainingDeck),
                 pendingMoves: JSON.stringify(pendingMoves),
                 playerOnePlayedFirstTurn: playerOnePlayedFirstTurn,
@@ -1516,10 +1561,41 @@ function waitForCardCompletion() {
     });
 }
 
+function updateEndTurnButtonVisibility() {
+    const endTurnBtn = document.getElementById('end-turn-early-btn');
+    if (endTurnBtn) {
+        if (currentPlayer === playerId && selectedCard && playsRemaining > 0) {
+            endTurnBtn.classList.add('visible');
+        } else {
+            endTurnBtn.classList.remove('visible');
+        }
+    }
+}
+
 window.onload = function() {
     buildBoard();
     setBoardState(currentState, playerOneColor, playerTwoColor);
     setupFirebaseListeners();
     updateTurnIndicator();
     updateDeckIndicators();
+    
+    const endTurnBtn = document.getElementById('end-turn-early-btn');
+    if (endTurnBtn) {
+        endTurnBtn.addEventListener('click', function() {
+            if (selectedCard && currentPlayer === playerId) {
+                endTurn(selectedCard);
+                selectedCard = null;
+                playsRemaining = 0;
+                displayCurrentCard(null);
+                groundTruthFirstClick = null;
+                hotspotFirstClick = null;
+                hotspotPhase = "initial";
+                document.querySelectorAll('.board-space').forEach(space => {
+                    space.classList.remove('highlight-change');
+                });
+                updateTurnIndicator();
+                updateEndTurnButtonVisibility();
+            }
+        });
+    }
 }

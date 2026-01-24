@@ -701,12 +701,7 @@ function projectPieces(newBoard, square, direction) {
             break;
     }
     
-    if (isValidMove(square, targetSquare)) {
-        newBoard[targetSquare] = piece;
-        newBoard[square] = 0;
-    } else {
-        newBoard[square] = 0;
-    }
+    newBoard[square] = 0;
 }
 
 function nearestNeighbor(newBoard, originalBoard, square, direction, player) {

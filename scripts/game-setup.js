@@ -35,6 +35,7 @@ function createGame(playerOneColor, numberOfCards, coordinates, zoom, basemap) {
         playerTwoHand: JSON.stringify(playerTwoHand),
         playerOnePlayedFirstTurn: false,
         playerTwoPlayedFirstTurn: false,
+        playsRemaining: 0,
         remainingDeck: JSON.stringify(remainingDeck),
         pendingMoves: JSON.stringify([]),
         gameLog: JSON.stringify([]),
