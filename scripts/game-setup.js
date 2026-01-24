@@ -5,7 +5,7 @@ function createGame(playerOneColor, numberOfCards, coordinates, zoom, basemap) {
     const gameId = Math.random().toString(36).substring(2, 7);
     console.log("Game ID:", gameId);
 
-    let remainingDeck = Array.from({ length: 20 }, (_, i) => i + 1);
+    let remainingDeck = Array.from({ length: 21 }, (_, i) => i + 1);
     remainingDeck = shuffleArray(remainingDeck);
 
     let playerOneHand = [];

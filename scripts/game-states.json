@@ -1,25 +1,28 @@
 {
   "game-states": {
-    "game-xxxx": {
+    "game-xxxxx": {
       "basemap": "imagery",
-      "coordinates": "[40.7128,-74.006]",
+      "coordinates": "[-15,-60]",
       "currentPlayer": 1,
       "discardPile": "[]",
       "gameId": "xxxxx",
       "gameLog": "[]",
       "gameState": "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]",
+      "lastPlayedCard": 99,
+      "lastPlayedCardPlayer": 1,
       "pendingMoves": "[]",
-      "playerOneColor": "rgba(255, 0, 255, 1)",
-      "playerOneHand": "[8,6,14,99]",
-      "playerOneJoined": false,
+      "playerOneColor": "rgba(227, 239, 5, 1)",
+      "playerOneHand": "[13,6,7,9,10,21,99]",
+      "playerOneJoined": true,
       "playerOnePlayedFirstTurn": false,
       "playerTwoColor": "rgba(0, 0, 255, 1)",
-      "playerTwoHand": "[7,5,1,99]",
-      "playerTwoJoined": false,
+      "playerTwoHand": "[11,12,15,18,19,20,99]",
+      "playerTwoJoined": true,
       "playerTwoPlayedFirstTurn": false,
+      "playsRemaining": 0,
       "previousState": "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]",
-      "remainingDeck": "[9,20,15,16,12,11,17,3,10,19,4,13,2,18]",
-      "zoom": 12
+      "remainingDeck": "[16,18,1,17,11,19,12,14,10,8]",
+      "zoom": 3
     }
   }
 }

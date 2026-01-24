@@ -290,10 +290,7 @@ const cardTypes = {
         executionType: "choice-direction",
         execute: function(board, previousState, chosenDirection, player) {
             let newBoard = [...board];
-
-            board.forEach((space, index) => {
-                projectPieces(newBoard, index, chosenDirection, player);
-            });
+            projectPieces(newBoard, chosenDirection);
             addLog(`Project: Moved all pieces ${chosenDirection}`);
             return newBoard;
         }    
@@ -675,33 +672,38 @@ function interpolateFill(newBoard, originalBoard, square, player) {
     return false;
 }
 
-function projectPieces(newBoard, square, direction) {
-    let piece = newBoard[square];
-
-    switch(direction) {
-        case "North":
-            if (isValidMove(square, square - 10)) {
-                newBoard[square - 10] = piece;
-            }
-            break;
-        case "South":
-            if (isValidMove(square, square + 10)) {
-                newBoard[square + 10] = piece;
-            }
-            break;
-        case "East":
-            if (isValidMove(square, square + 1)) {
-                newBoard[square + 1] = piece;
-            }
-            break;
-        case "West":
-            if (isValidMove(square, square - 1)) {
-                newBoard[square - 1] = piece;
-            }
-            break;
+function projectPieces(newBoard, direction) {
+    const boardSize = 100;
+    let indices = [];
+    
+    for (let i = 0; i < boardSize; i++) {
+        indices.push(i);
     }
     
-    newBoard[square] = 0;
+    if (direction === "South" || direction === "East") {
+        indices.reverse();
+    }
+    
+    indices.forEach(square => {
+        let piece = newBoard[square];
+        
+        if (piece === 0) return;
+        
+        let targetSquare;
+        switch(direction) {
+            case "North": targetSquare = square - 10; break;
+            case "South": targetSquare = square + 10; break;
+            case "East": targetSquare = square + 1; break;
+            case "West": targetSquare = square - 1; break;
+        }
+        
+        if (isValidMove(square, targetSquare) && newBoard[targetSquare] === 0) {
+            newBoard[targetSquare] = piece;
+            newBoard[square] = 0;
+        } else if (!isValidMove(square, targetSquare)) {
+            newBoard[square] = 0;
+        }
+    });
 }
 
 function nearestNeighbor(newBoard, originalBoard, square, direction, player) {

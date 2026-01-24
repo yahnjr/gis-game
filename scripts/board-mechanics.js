@@ -260,7 +260,10 @@ async function selectCard(card) {
     selectedCard = card;
     displayCurrentCard(card);
     addLog(`Player ${currentPlayer} selected ${card.name}`);
-    updateEndTurnButtonVisibility();
+    const endTurnBtn = document.getElementById('end-turn-early-btn');
+    if (endTurnBtn) {
+        endTurnBtn.classList.add('visible');
+    }
 
     if (card.cardId === 99) {
         playsRemaining = card.numberOfPlays || 1;
@@ -321,16 +324,16 @@ function setupFirebaseListeners() {
             const gameStateKey = Object.keys(data)[0];
             const gameData = data[gameStateKey];
 
-            if (playerId === 1 && gameData.playerOneJoined) {
-                alert('Player 1 slot is already taken!');
-                window.location.href = '../index.html';
-                return;
-            }
-            if (playerId === 2 && gameData.playerTwoJoined) {
-                alert('Player 2 slot is already taken!');
-                window.location.href = '../index.html';
-                return;
-            }
+            // if (playerId === 1 && gameData.playerOneJoined) {
+            //     alert('Player 1 slot is already taken!');
+            //     window.location.href = '../index.html';
+            //     return;
+            // }
+            // if (playerId === 2 && gameData.playerTwoJoined) {
+            //     alert('Player 2 slot is already taken!');
+            //     window.location.href = '../index.html';
+            //     return;
+            // }
 
             const updateData = {};
             if (playerId === 1) {
@@ -503,7 +506,6 @@ updateTurnIndicator = function() {
     }
     
     updateDeckIndicators();
-    updateEndTurnButtonVisibility();
 };
 
 function createBlocker(targetHand) {
@@ -944,6 +946,7 @@ function switchPlayer() {
 function endTurn(card) {
     let currentHand = currentPlayer === 1 ? playerOneHand : playerTwoHand;
     const cardIndex = currentHand.indexOf(card.cardId);
+    const endTurnBtn = document.getElementById('end-turn-early-button');
     currentHand.splice(cardIndex, 1);
     lastPlayedCard = card.cardId;
     lastPlayedCardPlayer = currentPlayer;
@@ -965,6 +968,10 @@ function endTurn(card) {
     updateFirebase();
 
     currentHand = currentPlayer === 1 ? playerOneHand : playerTwoHand;
+
+    if (endTurnBtn) {
+        endTurnBtn.classList.remove('visible');
+    }
     
     if (playerOneHand.length === 0 && playerTwoHand.length === 0) {
         beginEndGame();
@@ -1016,30 +1023,121 @@ function highlightChanges(newState, oldState) {
 }
 
 function createChoiceModal(choiceType) {
+    if (choiceType === "Direction") {
+        return createDirectionChoiceModal();
+    } else if (choiceType === "Layer Type") {
+        return createLayerChoiceModal();
+    }
+}
+
+function createDirectionChoiceModal() {
     return new Promise((resolve) => {
         const modalOverlay = document.createElement('div');
         modalOverlay.id = 'board-overlay';
 
         const choiceContent = document.createElement('div');
         choiceContent.id = 'choice-content';
-        choiceContent.classList.add('card-container');
+        choiceContent.classList.add('magnified-card-display');
+        choiceContent.classList.add('magnified-card');
+        choiceContent.style.border = `3px solid ${currentPlayer === 1 ? playerOneColor : playerTwoColor}`;
 
         const choiceTitle = document.createElement('h3');
-        choiceTitle.innerText = `Choose ${choiceType}`;
+        choiceTitle.innerText = 'Choose Direction';
         choiceContent.appendChild(choiceTitle);
 
-        const options = choiceType === "Direction" 
-            ? ['North', 'East', 'South', 'West']
-            : ['Points', 'Lines', 'Polygons'];
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.className = 'direction-buttons-container';
 
-        options.forEach(option => {
+        const directions = [
+            { name: 'North', key: 'north', label: 'N' },
+            { name: 'South', key: 'south', label: 'S' },
+            { name: 'East', key: 'east', label: 'E' },
+            { name: 'West', key: 'west', label: 'W' }
+        ];
+
+        directions.forEach(dir => {
             const button = document.createElement('button');
-            button.innerText = option;
+            button.className = `direction-btn direction-btn-${dir.key}`;
+            button.innerText = dir.label;
             button.addEventListener('click', function() {
-                addLog(`Chosen ${choiceType}: ${option}`);
+                addLog(`Chosen Direction: ${dir.name}`);
                 modalOverlay.remove();
-                resolve(option); 
+                resolve(dir.name); 
             });
+            buttonsContainer.appendChild(button);
+        });
+
+        choiceContent.appendChild(buttonsContainer);
+        modalOverlay.appendChild(choiceContent);
+        document.body.appendChild(modalOverlay);
+    });
+}
+
+function createLayerChoiceModal() {
+    return new Promise((resolve) => {
+        const modalOverlay = document.createElement('div');
+        modalOverlay.id = 'board-overlay';
+
+        const choiceContent = document.createElement('div');
+        choiceContent.id = 'choice-content';
+        choiceContent.classList.add('magnified-card-display');
+        choiceContent.classList.add('magnified-card');
+        choiceContent.style.border = `3px solid ${currentPlayer === 1 ? playerOneColor : playerTwoColor}`;
+
+        const choiceTitle = document.createElement('h3');
+        choiceTitle.innerText = 'Choose Layer Type';
+        choiceContent.appendChild(choiceTitle);
+
+        const layers = [
+            { name: 'Points', type: 'point' },
+            { name: 'Lines', type: 'line' },
+            { name: 'Polygons', type: 'polygon' }
+        ];
+
+        layers.forEach(layer => {
+            const button = document.createElement('button');
+            button.style.width = '100%';
+            button.style.display = 'flex';
+            button.style.alignItems = 'center';
+            button.style.justifyContent = 'center';
+            
+            const content = document.createElement('div');
+            content.className = 'layer-btn-content';
+            
+            const graphic = document.createElement('div');
+            graphic.className = 'layer-graphic';
+
+            if (layer.type === 'point') {
+                graphic.innerHTML = '<div class="layer-graphic-point" style="width: 8px; height: 8px; background: #333; border-radius: 50%; margin: 0 auto;"></div>';
+            } else if (layer.type === 'line') {
+                graphic.innerHTML = `<svg viewBox="0 0 20 12" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="2" cy="6" r="2" fill="#333"/>
+                    <line x1="4" y1="6" x2="16" y2="6" stroke="#333" stroke-width="1"/>
+                    <circle cx="18" cy="6" r="2" fill="#333"/>
+                </svg>`;
+            } else if (layer.type === 'polygon') {
+                graphic.innerHTML = `<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="2" cy="4" r="1.5" fill="#333"/>
+                    <circle cx="18" cy="6" r="1.5" fill="#333"/>
+                    <circle cx="16" cy="18" r="1.5" fill="#333"/>
+                    <circle cx="4" cy="16" r="1.5" fill="#333"/>
+                    <circle cx="10" cy="10" r="1.5" fill="#333"/>
+                    <polyline points="2,4 18,6 16,18 4,16 2,4" stroke="#333" stroke-width="0.8" fill="none"/>
+                </svg>`;
+            }
+
+            content.appendChild(graphic);
+            const label = document.createElement('span');
+            label.innerText = layer.name;
+            content.appendChild(label);
+            button.appendChild(content);
+
+            button.addEventListener('click', function() {
+                addLog(`Chosen Layer Type: ${layer.name}`);
+                modalOverlay.remove();
+                resolve(layer.name); 
+            });
+
             choiceContent.appendChild(button);
         });
 
@@ -1092,69 +1190,47 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
             existingOverlay.remove();
         }
 
-        let currentIndex = 0;
-
         const overlay = document.createElement('div');
         overlay.id = 'board-overlay';
 
-        const cardContainer = document.createElement('div');
-        cardContainer.className = 'card-selector-container';
+        const selectionContainer = document.createElement('div');
+        selectionContainer.className = 'collaboration-selection-container';
 
-        const prevButton = document.createElement('button');
-        prevButton.className = 'nav-button prev-button';
-        prevButton.innerHTML = '◀';
-        prevButton.addEventListener('click', function() {
-            currentIndex = (currentIndex - 1 + opponentHand.length) % opponentHand.length;
-            updateDisplayedCard();
+        const selectionTitle = document.createElement('h2');
+        selectionTitle.innerText = 'Choose one card to reveal:';
+        selectionTitle.style.marginBottom = '20px';
+
+        const cardGrid = document.createElement('div');
+        cardGrid.className = 'card-selection-grid';
+        cardGrid.style.display = 'grid';
+        cardGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(100px, 1fr))';
+        cardGrid.style.gap = '10px';
+        cardGrid.style.marginBottom = '20px';
+
+        const opponentColor = currentPlayer === 1 ? playerTwoColor : playerOneColor;
+
+        opponentHand.forEach((cardId) => {
+            const cardElement = createCardElement(cardId, opponentColor, false);
+            cardElement.style.cursor = 'pointer';
+            cardElement.addEventListener('click', function() {
+                showRevealedCard(cardId);
+            });
+
+            cardGrid.appendChild(cardElement);
         });
 
-        const cardWrapper = document.createElement('div');
-        cardWrapper.className = 'card-wrapper';
+        selectionContainer.appendChild(selectionTitle);
+        selectionContainer.appendChild(cardGrid);
+        overlay.appendChild(selectionContainer);
 
-        const nextButton = document.createElement('button');
-        nextButton.className = 'nav-button next-button';
-        nextButton.innerHTML = '▶';
-        nextButton.addEventListener('click', function() {
-            currentIndex = (currentIndex + 1) % opponentHand.length;
-            updateDisplayedCard();
-        });
+        function showRevealedCard(selectedCardId) {
+            selectionContainer.style.display = 'none';
 
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'collaboration-buttons';
+            const revealContainer = document.createElement('div');
+            revealContainer.className = 'collaboration-reveal-container';
 
-        const useButton = document.createElement('button');
-        useButton.className = 'action-button';
-        useButton.innerText = 'Use This Card';
-        useButton.addEventListener('click', function() {
-            const selectedCardId = opponentHand[currentIndex];
-            addLog(`Using opponent's card`);
-            overlay.remove();
-            resolve({ cardId: selectedCardId, action: 'use' });
-        });
+            const card = getCardById(selectedCardId);
 
-        const discardButton = document.createElement('button');
-        discardButton.className = 'action-button discard-action';
-        discardButton.innerText = 'Discard This Card';
-        discardButton.addEventListener('click', function() {
-            const selectedCardId = opponentHand[currentIndex];
-            addLog(`Forcing opponent to discard card`);
-            overlay.remove();
-            resolve({ cardId: selectedCardId, action: 'discard' });
-        });
-
-        const cancelButton = document.createElement('button');
-        cancelButton.className = 'cancel-button';
-        cancelButton.innerText = 'Cancel';
-        cancelButton.addEventListener('click', function() {
-            overlay.remove();
-            resolve(null);
-        });
-
-        function updateDisplayedCard() {
-            cardWrapper.innerHTML = '';
-            const cardId = opponentHand[currentIndex];
-            const card = getCardById(cardId);
-            
             const magnifiedCard = document.createElement('div');
             magnifiedCard.classList.add('magnified-card');
             magnifiedCard.style.backgroundColor = 'white';
@@ -1162,74 +1238,51 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
             magnifiedCard.style.borderRadius = '8px';
             magnifiedCard.style.padding = '20px';
             magnifiedCard.style.border = `3px solid ${currentPlayer === 1 ? playerOneColor : playerTwoColor}`;
-            
+            magnifiedCard.style.marginBottom = '20px';
+
             const cardTitle = document.createElement('h3');
             cardTitle.innerText = card.name;
             cardTitle.style.fontSize = '18px';
             cardTitle.style.marginBottom = '10px';
-            
+
             const cardDescription = document.createElement('p');
             cardDescription.innerText = card.description;
             cardDescription.style.fontSize = '12px';
             cardDescription.style.lineHeight = '1.4';
-            
+
             magnifiedCard.appendChild(cardTitle);
             magnifiedCard.appendChild(cardDescription);
-            cardWrapper.appendChild(magnifiedCard);
 
-            if (opponentHand.length <= 1) {
-                prevButton.style.visibility = 'hidden';
-                nextButton.style.visibility = 'hidden';
-            } else {
-                prevButton.style.visibility = 'visible';
-                nextButton.style.visibility = 'visible';
-            }
-        }
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'collaboration-buttons';
+            buttonContainer.style.display = 'flex';
+            buttonContainer.style.gap = '10px';
+            buttonContainer.style.justifyContent = 'center';
 
-        updateDisplayedCard();
-
-        cardContainer.appendChild(prevButton);
-        cardContainer.appendChild(cardWrapper);
-        cardContainer.appendChild(nextButton);
-
-        buttonContainer.appendChild(useButton);
-        buttonContainer.appendChild(discardButton);
-
-        overlay.appendChild(cardContainer);
-        overlay.appendChild(buttonContainer);
-        overlay.appendChild(cancelButton);
-
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) {
+            const useButton = document.createElement('button');
+            useButton.className = 'action-button';
+            useButton.innerText = 'Use This Card';
+            useButton.addEventListener('click', function() {
+                addLog(`Using opponent's card`);
                 overlay.remove();
-                resolve(null);
-            }
-        });
+                resolve({ cardId: selectedCardId, action: 'use' });
+            });
 
-        let touchStartX = 0;
-        let touchEndX = 0;
+            const discardButton = document.createElement('button');
+            discardButton.className = 'action-button discard-action';
+            discardButton.innerText = 'Discard This Card';
+            discardButton.addEventListener('click', function() {
+                addLog(`Forcing opponent to discard card`);
+                overlay.remove();
+                resolve({ cardId: selectedCardId, action: 'discard' });
+            });
 
-        cardWrapper.addEventListener('touchstart', function(e) {
-            touchStartX = e.changedTouches[0].screenX;
-        }, false);
+            buttonContainer.appendChild(useButton);
+            buttonContainer.appendChild(discardButton);
 
-        cardWrapper.addEventListener('touchend', function(e) {
-            touchEndX = e.changedTouches[0].screenX;
-            handleSwipe();
-        }, false);
-
-        function handleSwipe() {
-            const swipeThreshold = 50;
-            const diff = touchStartX - touchEndX;
-
-            if (Math.abs(diff) > swipeThreshold) {
-                if (diff > 0) {
-                    currentIndex = (currentIndex + 1) % opponentHand.length;
-                } else {
-                    currentIndex = (currentIndex - 1 + opponentHand.length) % opponentHand.length;
-                }
-                updateDisplayedCard();
-            }
+            revealContainer.appendChild(magnifiedCard);
+            revealContainer.appendChild(buttonContainer);
+            overlay.appendChild(revealContainer);
         }
 
         document.body.appendChild(overlay);
@@ -1561,15 +1614,23 @@ function waitForCardCompletion() {
     });
 }
 
-function updateEndTurnButtonVisibility() {
-    const endTurnBtn = document.getElementById('end-turn-early-btn');
-    if (endTurnBtn) {
-        if (currentPlayer === playerId && selectedCard && playsRemaining > 0) {
-            endTurnBtn.classList.add('visible');
-        } else {
-            endTurnBtn.classList.remove('visible');
+const endTurnBtn = document.getElementById('end-turn-early-btn');
+if (endTurnBtn) {
+    endTurnBtn.addEventListener('click', function() {
+        if (selectedCard && currentPlayer === playerId) {
+            endTurn(selectedCard);
+            selectedCard = null;
+            playsRemaining = 0;
+            displayCurrentCard(null);
+            groundTruthFirstClick = null;
+            hotspotFirstClick = null;
+            hotspotPhase = "initial";
+            document.querySelectorAll('.board-space').forEach(space => {
+                space.classList.remove('highlight-change');
+            });
+            updateTurnIndicator();
         }
-    }
+    });
 }
 
 window.onload = function() {
@@ -1579,23 +1640,4 @@ window.onload = function() {
     updateTurnIndicator();
     updateDeckIndicators();
     
-    const endTurnBtn = document.getElementById('end-turn-early-btn');
-    if (endTurnBtn) {
-        endTurnBtn.addEventListener('click', function() {
-            if (selectedCard && currentPlayer === playerId) {
-                endTurn(selectedCard);
-                selectedCard = null;
-                playsRemaining = 0;
-                displayCurrentCard(null);
-                groundTruthFirstClick = null;
-                hotspotFirstClick = null;
-                hotspotPhase = "initial";
-                document.querySelectorAll('.board-space').forEach(space => {
-                    space.classList.remove('highlight-change');
-                });
-                updateTurnIndicator();
-                updateEndTurnButtonVisibility();
-            }
-        });
-    }
 }
