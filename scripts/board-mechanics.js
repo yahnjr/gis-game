@@ -541,12 +541,20 @@ function dealCards(playerId) {
     handContainer.innerHTML = '';
 
     const currentPlayerColor = playerId === 1 ? playerOneColor : playerTwoColor;
+    const hasPlayedFirstTurn = playerId === 1 ? playerOnePlayedFirstTurn : playerTwoPlayedFirstTurn;
     
     playerHand.forEach(cardId => {
+        if (cardId === 99) return;
+        
         const cardContainer = createCardElement(cardId, currentPlayerColor, true);
         cardContainer.addEventListener('click', function() {
             if (currentPlayer !== playerId) {
                 alert('Please wait for your turn!');
+                return;
+            }
+
+            if (!hasPlayedFirstTurn) {
+                alert('Complete your first turn before selecting cards!');
                 return;
             }
             const card = getCardById(cardId);
@@ -1180,10 +1188,11 @@ function createDeckChoiceModal(numberOfCards) {
     return new Promise((resolve) => {
         window.cardSelectorResolve = resolve;
 
-        const topCards = remainingDeck.slice(0, numberOfCards);
+        const forbiddenCardIds = [14, 18, 19, 20];
+        const topCards = remainingDeck.slice(0, numberOfCards).filter(cardId => !forbiddenCardIds.includes(cardId));
         
         if (topCards.length === 0) {
-            alert('No cards in deck');
+            alert('No valid cards in deck');
             resolve(null);
             return;
         }
