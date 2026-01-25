@@ -9,12 +9,15 @@ let previousState = Array(100).fill(0);
 let mapCoordinates = [0, 0];
 let mapZoom = 1;
 let mapBasemap = 'imagery';
+let initialPieces = 10;
 let playerOneColor;
 let playerTwoColor;
 let playerOneHand = [];
 let playerTwoHand = [];
 let playerOnePlayedFirstTurn = false;
 let playerTwoPlayedFirstTurn = false;
+let gameOver = false;
+let cumulativeScore = {playerOne: 0, playerTwo: 0};
 let discardPile = [];
 let lastPlayedCard = 99;
 let lastPlayedCardPlayer = 1;
@@ -34,6 +37,7 @@ document.getElementById('game-id-display').textContent = `Game: ${gameId}`;
 
 firebase.initializeApp(firebaseConfig);
 db = firebase.database();
+const gameStatesRef = db.ref('game-states');
 
 function addLog(message) {
     const now = new Date();
@@ -315,8 +319,6 @@ async function selectCard(card) {
 }
 
 function setupFirebaseListeners() {
-    const gameStatesRef = db.ref('game-states');
-
     gameStatesRef.orderByChild('gameId').equalTo(gameId).once('value', (snapshot) => {
         const data = snapshot.val();
 
@@ -354,8 +356,6 @@ function setupGameStateListener() {
     if (isListenerSetup) return;
     isListenerSetup = true;
     
-    const gameStatesRef = db.ref('game-states');
-    
     gameStatesRef.orderByChild('gameId').equalTo(gameId).on('value', (snapshot) => {
         const data = snapshot.val();
 
@@ -364,10 +364,6 @@ function setupGameStateListener() {
             const gameData = data[gameStateKey];
 
             if (gameData.gameState) {
-                if (currentState && currentState.length > 0) {
-                    previousState = [...currentState];
-                }
-
                 currentState = JSON.parse(gameData.gameState);
                 currentPlayer = gameData.currentPlayer || 1;
 
@@ -383,6 +379,10 @@ function setupGameStateListener() {
 
                 playerOneColor = gameData.playerOneColor;
                 playerTwoColor = gameData.playerTwoColor;
+
+                initialPieces = gameData.initialPieces || 10;
+                gameOver = gameData.gameOver || false;
+                cumulativeScore = gameData.cumulativeScore ? JSON.parse(gameData.cumulativeScore) : {playerOne: 0, playerTwo: 0};
 
                 playerOneHand = JSON.parse(gameData.playerOneHand);
                 playerTwoHand = JSON.parse(gameData.playerTwoHand);
@@ -407,6 +407,16 @@ function setupGameStateListener() {
                 
                 highlightChanges(currentState, previousState);
 
+                if (gameOver) {
+                    setTimeout(() => {
+                        const scores = calculateGameScore(currentState);
+                        const winner = scores.playerOne.finalScore > scores.playerTwo.finalScore ? 'Player One Wins!' :
+                                    scores.playerTwo.finalScore > scores.playerOne.finalScore ? 'Player Two Wins!' :
+                                    'It\'s a Tie!';
+                        displayGameOverScreen(scores, winner);
+                    }, 500);
+                    return;
+                }
                 dealCards(playerId);
                 updateTurnIndicator();
                 displayCurrentCard(null);
@@ -779,7 +789,7 @@ function executeCard(clickedSquare) {
             if (firstCard) {
                 selectedCard = firstCard;
                 displayCurrentCard(firstCard);
-                playsRemaining = firstCard.numberOfPlays || 1;
+                playsRemaining = initialPieces || firstCard.numberOfPlays || 1;
                 addLog(`Player ${currentPlayer} auto-selected ${firstCard.name}`);
             } else {
                 alert('First turn card not found!');
@@ -832,11 +842,21 @@ function executeCard(clickedSquare) {
 
     if (card.executionType === "spatial-join") {
         let result = card.execute(currentState, clickedSquare, currentPlayer, isValidMove);
-        
+    
         if (result !== false) {
             currentState = result;
             setBoardState(currentState, playerOneColor, playerTwoColor);
             playsRemaining--;
+            
+            if (currentState.spatialJoinFeatures) {
+                currentState.spatialJoinFeatures.forEach((feature, index) => {
+                    if (!currentState.spatialJoinUsedFeatures.has(index)) {
+                        feature.squares.forEach(square => {
+                            document.getElementById(`board-space${square}`).classList.add('highlight-change');
+                        });
+                    }
+                });
+            }
 
             updateFirebase();
             
@@ -845,6 +865,8 @@ function executeCard(clickedSquare) {
                     space.classList.remove('highlight-change');
                 });
                 delete currentState.spatialJoinValidSquares;
+                delete currentState.spatialJoinFeatures;
+                delete currentState.spatialJoinUsedFeatures;
                 endTurn(card);
             }
         } else {
@@ -890,20 +912,11 @@ function executeCard(clickedSquare) {
                     updateFirebase();
                     
                     if (playsRemaining === 0) {
-                        if (validateHotspotPolygon()) {
-                            document.querySelectorAll('.board-space').forEach(space => {
-                                space.classList.remove('highlight-change');
-                            });
-                            delete currentState.hotspotAnchor;
-                            endTurn(card);
-                        } else {
-                            alert('Pieces must form a polygon with the anchor piece. Turn cancelled.');
-                            addLog('Hotspot validation failed - turn cancelled');
-                            document.querySelectorAll('.board-space').forEach(space => {
-                                space.classList.remove('highlight-change');
-                            });
-                            delete currentState.hotspotAnchor;
-                        }
+                        document.querySelectorAll('.board-space').forEach(space => {
+                            space.classList.remove('highlight-change');
+                        });
+                        delete currentState.hotspotAnchor;
+                        endTurn(card);
                     }
                 } else {
                     addLog("Invalid move, try again");
@@ -937,6 +950,7 @@ function executeCard(clickedSquare) {
 
 function switchPlayer() {
     currentPlayer = currentPlayer === 1 ? 2 : 1;
+    previousState = [...currentState]
     addLog(`Switched to Player ${currentPlayer}'s turn`);
     dealCards(playerId);
     updateTurnIndicator();
@@ -981,9 +995,7 @@ function endTurn(card) {
     }
 }
 
-function updateFirebase() {
-    const gameStatesRef = db.ref('game-states');
-    
+function updateFirebase() {  
     gameStatesRef.orderByChild('gameId').equalTo(gameId).once('value', (snapshot) => {
         const data = snapshot.val();
         
@@ -1067,6 +1079,12 @@ function createDirectionChoiceModal() {
             buttonsContainer.appendChild(button);
         });
 
+        const compassIcon = document.createElement('img');
+        compassIcon.src = '../styles/compass.svg';
+        compassIcon.alt = 'Compass Icon';
+        compassIcon.classList.add('compass-icon');
+        buttonsContainer.appendChild(compassIcon);
+
         choiceContent.appendChild(buttonsContainer);
         modalOverlay.appendChild(choiceContent);
         document.body.appendChild(modalOverlay);
@@ -1096,10 +1114,7 @@ function createLayerChoiceModal() {
 
         layers.forEach(layer => {
             const button = document.createElement('button');
-            button.style.width = '100%';
-            button.style.display = 'flex';
-            button.style.alignItems = 'center';
-            button.style.justifyContent = 'center';
+            button.classList.add('layer-btn');
             
             const content = document.createElement('div');
             content.className = 'layer-btn-content';
@@ -1197,21 +1212,17 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
         selectionContainer.className = 'collaboration-selection-container';
 
         const selectionTitle = document.createElement('h2');
+        selectionTitle.className = 'collaboration-selection-title';
         selectionTitle.innerText = 'Choose one card to reveal:';
-        selectionTitle.style.marginBottom = '20px';
 
         const cardGrid = document.createElement('div');
         cardGrid.className = 'card-selection-grid';
-        cardGrid.style.display = 'grid';
-        cardGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(100px, 1fr))';
-        cardGrid.style.gap = '10px';
-        cardGrid.style.marginBottom = '20px';
 
         const opponentColor = currentPlayer === 1 ? playerTwoColor : playerOneColor;
 
         opponentHand.forEach((cardId) => {
             const cardElement = createCardElement(cardId, opponentColor, false);
-            cardElement.style.cursor = 'pointer';
+            cardElement.classList.add('collaboration-card-clickable');
             cardElement.addEventListener('click', function() {
                 showRevealedCard(cardId);
             });
@@ -1224,7 +1235,7 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
         overlay.appendChild(selectionContainer);
 
         function showRevealedCard(selectedCardId) {
-            selectionContainer.style.display = 'none';
+            selectionContainer.classList.add('collaboration-selection-hidden');
 
             const revealContainer = document.createElement('div');
             revealContainer.className = 'collaboration-reveal-container';
@@ -1232,32 +1243,22 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
             const card = getCardById(selectedCardId);
 
             const magnifiedCard = document.createElement('div');
-            magnifiedCard.classList.add('magnified-card');
-            magnifiedCard.style.backgroundColor = 'white';
-            magnifiedCard.style.color = '#333';
-            magnifiedCard.style.borderRadius = '8px';
-            magnifiedCard.style.padding = '20px';
+            magnifiedCard.classList.add('magnified-card', 'collaboration-reveal-card');
             magnifiedCard.style.border = `3px solid ${currentPlayer === 1 ? playerOneColor : playerTwoColor}`;
-            magnifiedCard.style.marginBottom = '20px';
 
             const cardTitle = document.createElement('h3');
+            cardTitle.className = 'collaboration-card-title';
             cardTitle.innerText = card.name;
-            cardTitle.style.fontSize = '18px';
-            cardTitle.style.marginBottom = '10px';
 
             const cardDescription = document.createElement('p');
+            cardDescription.className = 'collaboration-card-description';
             cardDescription.innerText = card.description;
-            cardDescription.style.fontSize = '12px';
-            cardDescription.style.lineHeight = '1.4';
 
             magnifiedCard.appendChild(cardTitle);
             magnifiedCard.appendChild(cardDescription);
 
             const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'collaboration-buttons';
-            buttonContainer.style.display = 'flex';
-            buttonContainer.style.gap = '10px';
-            buttonContainer.style.justifyContent = 'center';
+            buttonContainer.className = 'collaboration-buttons collaboration-reveal-buttons';
 
             const useButton = document.createElement('button');
             useButton.className = 'action-button';
@@ -1300,10 +1301,10 @@ function initializeSpatialJoin() {
             
             if (polygon) {
                 polygon.forEach(sq => visited.add(sq));
-                features.push({ type: 'polygon', squares: polygon });
+                features.push({ type: 'polygon', squares: polygon, id: `feature-${features.length}` });
             } else if (line) {
                 line.forEach(sq => visited.add(sq));
-                features.push({ type: 'line', squares: line });
+                features.push({ type: 'line', squares: line, id: `feature-${features.length}` });
             }
         }
     });
@@ -1314,9 +1315,12 @@ function initializeSpatialJoin() {
         return;
     }
     
-    const validSquares = new Set();
+    currentState.spatialJoinFeatures = features;
+    currentState.spatialJoinUsedFeatures = new Set();
     
-    features.forEach(feature => {
+    const validSquares = new Map();
+    
+    features.forEach((feature, featureIndex) => {
         feature.squares.forEach(square => {
             const neighbors = feature.type === 'polygon' 
                 ? [square - 1, square + 1, square - 10, square + 10]
@@ -1324,13 +1328,11 @@ function initializeSpatialJoin() {
             
             neighbors.forEach(neighbor => {
                 if (isValidMove(square, neighbor) && currentState[neighbor] === 0) {
-                    validSquares.add(neighbor);
+                    validSquares.set(neighbor, featureIndex);
                 }
             });
         });
-    });
-    
-    features.forEach(feature => {
+        
         feature.squares.forEach(square => {
             document.getElementById(`board-space${square}`).classList.add('highlight-change');
         });
@@ -1445,57 +1447,127 @@ async function beginEndGame() {
     
     addLog(winner);
 
+    if (winner === 'Player One Wins!') {
+        cumulativeScore.playerOne++;
+    } else if (winner === 'Player Two Wins!') {
+        cumulativeScore.playerTwo++;
+    }
+
+    displayGameOverScreen(scores, winner);
+
+    gameStatesRef.orderByChild('gameId').equalTo(gameId).once('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            const gameStateKey = Object.keys(data)[0];
+            gameStatesRef.child(gameStateKey).update({
+                gameOver: true,
+                cumulativeScore: JSON.stringify(cumulativeScore)
+            });
+        }
+    });
+}
+
+function displayGameOverScreen(scores, winner) {
     const modalOverlay = document.createElement('div');
     modalOverlay.id = 'board-overlay';
 
     const resultContent = document.createElement('div');
     resultContent.id = 'choice-content';
-    resultContent.classList.add('card-container');
+    resultContent.classList.add('game-over-container');
     
     const resultTitle = document.createElement('h2');
     resultTitle.innerText = 'Game Over!';
-    
-    const statsText = document.createElement('p');
-    statsText.style.textAlign = 'left';
-    statsText.style.fontSize = '14px';
-    statsText.style.lineHeight = '1.6';
-    
-    let statsContent = `<strong>Feature Counts:</strong><br>`;
-    statsContent += `Total Features: ${scores.totalFeatures}<br>`;
-    statsContent += `Lines: ${scores.totalLines}<br>`;
-    statsContent += `Polygons: ${scores.totalPolygons}<br>`;
-    if (scores.largestPolygonPlayer) {
-        statsContent += `Largest Polygon: Player ${scores.largestPolygonPlayer} (${scores.largestPolygonSize} pieces)<br>`;
-    } else {
-        statsContent += `Largest Polygon: None<br>`;
-    }
-    statsContent += `<br><strong>Final Scores:</strong><br>`;
-    statsContent += `Player One: ${scores.playerOne.finalScore}<br>`;
-    statsContent += `Player Two: ${scores.playerTwo.finalScore}<br>`;
-    
-    statsText.innerHTML = statsContent;
-    
-    const winnerText = document.createElement('h3');
-    winnerText.innerText = winner;
-    
-    const scoreBreakdownText = document.createElement('p');
-    scoreBreakdownText.style.fontSize = '12px';
-    scoreBreakdownText.style.color = '#666';
-    scoreBreakdownText.innerHTML = `<strong>Player One Breakdown:</strong> Base: ${scores.playerOne.basePoints} + Lines: ${scores.playerOne.lineBonus} + Polygons: ${scores.playerOne.polygonBonus} + Largest: ${scores.playerOne.largestBonus}<br>` +
-                                   `<strong>Player Two Breakdown:</strong> Base: ${scores.playerTwo.basePoints} + Lines: ${scores.playerTwo.lineBonus} + Polygons: ${scores.playerTwo.polygonBonus} + Largest: ${scores.playerTwo.largestBonus}`;
+    resultContent.appendChild(resultTitle);
 
-    const replayButton = document.createElement('button');
-    replayButton.innerText = 'Play Again';
-    replayButton.addEventListener('click', function() {
-        modalOverlay.remove();
-        playAgain(gameId, 5);
+    const gameOverContent = document.createElement('div');
+    gameOverContent.className = 'game-over-content';
+
+    const playerOneColumn = document.createElement('div');
+    playerOneColumn.className = 'player-score-column';
+    playerOneColumn.style.borderLeftColor = playerOneColor;
+    
+    const playerOneTitle = document.createElement('h3');
+    playerOneTitle.innerText = `Player One`;
+    playerOneTitle.style.color = playerOneColor;
+    playerOneColumn.appendChild(playerOneTitle);
+
+    const p1Items = [
+        { label: 'Base Points', value: scores.playerOne.basePoints },
+        { label: 'Line Bonus', value: scores.playerOne.lineBonus },
+        { label: 'Polygon Bonus', value: scores.playerOne.polygonBonus },
+        { label: 'Largest Polygon', value: scores.playerOne.largestBonus }
+    ];
+
+    p1Items.forEach(item => {
+        const scoreItem = document.createElement('div');
+        scoreItem.className = 'score-item';
+        scoreItem.innerHTML = `<span class="score-label">${item.label}:</span><span class="score-value">${item.value}</span>`;
+        playerOneColumn.appendChild(scoreItem);
     });
 
-    resultContent.appendChild(resultTitle);
-    resultContent.appendChild(statsText);
-    resultContent.appendChild(winnerText);
-    resultContent.appendChild(scoreBreakdownText);
-    resultContent.appendChild(replayButton);
+    const p1Final = document.createElement('div');
+    p1Final.className = 'final-score';
+    p1Final.innerHTML = `<span>Total:</span><span>${scores.playerOne.finalScore}</span>`;
+    playerOneColumn.appendChild(p1Final);
+
+    const playerTwoColumn = document.createElement('div');
+    playerTwoColumn.className = 'player-score-column';
+    playerTwoColumn.style.borderLeftColor = playerTwoColor;
+    
+    const playerTwoTitle = document.createElement('h3');
+    playerTwoTitle.innerText = `Player Two`;
+    playerTwoTitle.style.color = playerTwoColor;
+    playerTwoColumn.appendChild(playerTwoTitle);
+
+    const p2Items = [
+        { label: 'Base Points', value: scores.playerTwo.basePoints },
+        { label: 'Line Bonus', value: scores.playerTwo.lineBonus },
+        { label: 'Polygon Bonus', value: scores.playerTwo.polygonBonus },
+        { label: 'Largest Polygon', value: scores.playerTwo.largestBonus }
+    ];
+
+    p2Items.forEach(item => {
+        const scoreItem = document.createElement('div');
+        scoreItem.className = 'score-item';
+        scoreItem.innerHTML = `<span class="score-label">${item.label}:</span><span class="score-value">${item.value}</span>`;
+        playerTwoColumn.appendChild(scoreItem);
+    });
+
+    const p2Final = document.createElement('div');
+    p2Final.className = 'final-score';
+    p2Final.innerHTML = `<span>Total:</span><span>${scores.playerTwo.finalScore}</span>`;
+    playerTwoColumn.appendChild(p2Final);
+
+    gameOverContent.appendChild(playerOneColumn);
+    gameOverContent.appendChild(playerTwoColumn);
+    resultContent.appendChild(gameOverContent);
+
+    const winnerBox = document.createElement('div');
+    winnerBox.className = 'game-over-winner';
+    winnerBox.innerText = winner;
+    resultContent.appendChild(winnerBox);
+
+    const cumulativeScoreDiv = document.createElement('div');
+    cumulativeScoreDiv.className = 'cumulative-score-div';
+    cumulativeScoreDiv.innerHTML = `<strong>Series Score:</strong> Player One: ${cumulativeScore.playerOne} | Player Two: ${cumulativeScore.playerTwo}`;
+    resultContent.appendChild(cumulativeScoreDiv);
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'game-over-actions';
+
+    if (playerId === 1) {
+        const replayButton = document.createElement('button');
+        replayButton.className = 'action-button';
+        replayButton.innerText = 'Play Again';
+        replayButton.addEventListener('click', function() {
+            modalOverlay.remove();
+            playAgain(gameId, 5);
+        });
+
+        actionsDiv.appendChild(replayButton);
+    }
+    
+    resultContent.appendChild(actionsDiv);
     
     modalOverlay.appendChild(resultContent);
     document.body.appendChild(modalOverlay);
@@ -1514,21 +1586,27 @@ async function processPendingMoves() {
             addLog(`Processing Model Builder for Player ${player} with card ${cardId}`);
             
             const card = getCardById(cardId);
-            if (card) {
+            if (card && playerId === player) {
                 await executeEndGameCard(card, player);
+            } else if (card) {
+                addLog(`Waiting for Player ${player} to execute their Model Builder card...`);
             }
             
         } else if (moveType === 'crunch') {
             const player = move[1];
             
             addLog(`Processing Crunch Time for Player ${player}`);
-            
-            const chosenCardId = await createDeckChoiceModal(3);
-            if (chosenCardId) {
-                const card = getCardById(chosenCardId);
-                if (card) {
-                    await executeEndGameCard(card, player);
+
+            if (playerId === player) {
+                const chosenCardId = await createDeckChoiceModal(3);
+                if (chosenCardId) {
+                    const card = getCardById(chosenCardId);
+                    if (card) {
+                        await executeEndGameCard(card, player);
+                    }
                 }
+            } else {
+                addLog(`Waiting for Player ${player} to choose their Crunch Time card...`);
             }
         }
     }
@@ -1546,14 +1624,20 @@ async function executeEndGameCard(card, player) {
 
         const messageContent = document.createElement('div');
         messageContent.id = 'choice-content';
-        messageContent.classList.add('card-container');
+        messageContent.classList.add('magnified-card-display');
+        messageContent.classList.add('magnified-card');
+        messageContent.style.border = `3px solid ${player === 1 ? playerOneColor : playerTwoColor}`;
         
         const messageTitle = document.createElement('h3');
+        messageTitle.className = 'magnified-card-title';
         messageTitle.innerText = `Player ${player}: Use ${card.name}`;
         
-        const cardElement = createCardElement(card.cardId);
+        const cardDescription = document.createElement('p');
+        cardDescription.className = 'magnified-card-description';
+        cardDescription.innerText = card.description;
         
         const continueButton = document.createElement('button');
+        continueButton.className = 'action-button';
         continueButton.innerText = 'Execute Card';
         continueButton.addEventListener('click', async function() {
             modalOverlay.remove();
@@ -1585,9 +1669,24 @@ async function executeEndGameCard(card, player) {
                     currentState = result;
                     setBoardState(currentState, playerOneColor, playerTwoColor);
                 }
+            } else if (card.executionType === "ground-truth") {
+                selectedCard = card;
+                playsRemaining = card.movesRemaining;
+                groundTruthFirstClick = null;
+                await waitForCardCompletion();
+            } else if (card.executionType === "spatial-join") {
+                initializeSpatialJoin();
+                await waitForCardCompletion();
+            } else if (card.executionType === "hotspot") {
+                selectedCard = card;
+                playsRemaining = card.movesRemaining;
+                hotspotFirstClick = null;
+                hotspotPhase = "initial";
+                await waitForCardCompletion();
             }
             
             currentPlayer = originalPlayer;
+            updateFirebase();
             
             await new Promise(r => setTimeout(r, 1000));
             
@@ -1595,7 +1694,7 @@ async function executeEndGameCard(card, player) {
         });
 
         messageContent.appendChild(messageTitle);
-        messageContent.appendChild(cardElement);
+        messageContent.appendChild(cardDescription);
         messageContent.appendChild(continueButton);
         modalOverlay.appendChild(messageContent);
         document.body.appendChild(modalOverlay);
@@ -1639,5 +1738,4 @@ window.onload = function() {
     setupFirebaseListeners();
     updateTurnIndicator();
     updateDeckIndicators();
-    
 }

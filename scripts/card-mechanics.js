@@ -201,16 +201,22 @@ const cardTypes = {
             
             const rowDiff = Math.abs(fromRow - toRow);
             const colDiff = Math.abs(fromCol - toCol);
+
+            if (fromSquare === toSquare) {
+                const isEdge = fromRow === 0 || fromRow === 9 || fromCol === 0 || fromCol === 9;
+                if (isEdge) {
+                    board[fromSquare] = 0;
+                    addLog("Piece on edge removed from board");
+                    return board;
+                } else {
+                    addLog("Can only remove pieces from the edge");
+                    return false;
+                }
+            }
             
             if (rowDiff > 1 || colDiff > 1 || (rowDiff === 0 && colDiff === 0)) {
                 addLog("Can only move one space at a time");
                 return false;
-            }
-            
-            if (toSquare < 0 || toSquare >= 100) {
-                board[fromSquare] = 0;
-                addLog("Piece moved off edge and removed");
-                return board;
             }
             
             if (board[toSquare] !== 0) {
@@ -312,13 +318,26 @@ const cardTypes = {
                 return false;
             } 
 
+            const featureIndex = board.spatialJoinValidSquares.get(startSquare);
+            
+            if (!board.spatialJoinUsedFeatures) {
+                board.spatialJoinUsedFeatures = new Set();
+            }
+            board.spatialJoinUsedFeatures.add(featureIndex);
+            
+            const squaresToRemove = [];
+            board.spatialJoinValidSquares.forEach((fIndex, square) => {
+                if (fIndex === featureIndex) {
+                    squaresToRemove.push(square);
+                }
+            });
+            squaresToRemove.forEach(sq => board.spatialJoinValidSquares.delete(sq));
+            
             board[startSquare] = player;
 
-            board.spatialJoinValidSquares.delete(startSquare);
-
-            addLog(`Spatial Join: Placed piece at square ${startSquare}`);
+            addLog(`Spatial Join: Placed piece at square ${startSquare} for feature ${featureIndex + 1}`);
             return board;
-        }    
+        }   
     },
 
     turnOffLayer: {

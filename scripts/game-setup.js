@@ -1,11 +1,14 @@
-function createGame(playerOneColor, numberOfCards, coordinates, zoom, basemap) {
+const deckLength = 21;
+
+function createGame(playerOneColor, numberOfCards, initialPieces, coordinates, zoom, basemap) {
     console.log("Starting game with color:", playerOneColor, "and number of cards:", numberOfCards);
+    console.log("Initial pieces to place:", initialPieces);
     console.log("Map settings - coordinates:", coordinates, "zoom:", zoom, "basemap:", basemap);
 
     const gameId = Math.random().toString(36).substring(2, 7);
     console.log("Game ID:", gameId);
 
-    let remainingDeck = Array.from({ length: 21 }, (_, i) => i + 1);
+    let remainingDeck = Array.from({ length: deckLength }, (_, i) => i + 1);
     remainingDeck = shuffleArray(remainingDeck);
 
     let playerOneHand = [];
@@ -39,6 +42,9 @@ function createGame(playerOneColor, numberOfCards, coordinates, zoom, basemap) {
         remainingDeck: JSON.stringify(remainingDeck),
         pendingMoves: JSON.stringify([]),
         gameLog: JSON.stringify([]),
+        initialPieces: initialPieces,
+        gameOver: false,
+        cumulativeScore: JSON.stringify({playerOne: 0, playerTwo: 0}),
         coordinates: JSON.stringify(coordinates),
         zoom: zoom,
         basemap: basemap
@@ -53,7 +59,7 @@ function createGame(playerOneColor, numberOfCards, coordinates, zoom, basemap) {
 }
 
 function playAgain(gameId, numberOfCards) {
-    let remainingDeck = Array.from({ length: 20 }, (_, i) => i + 1);
+    let remainingDeck = Array.from({ length: deckLength }, (_, i) => i + 1);
     remainingDeck = shuffleArray(remainingDeck);
 
     let playerOneHand = [];
@@ -81,15 +87,24 @@ function playAgain(gameId, numberOfCards) {
                 previousState: JSON.stringify(Array(100).fill(0)),
                 lastPlayedCard: 99,
                 lastPlayedCardPlayer: 1,
-                playerOneJoined: existingGameData.playerOneJoined || false,
-                playerTwoJoined: existingGameData.playerTwoJoined || false,
+                playerOneJoined: false,
+                playerTwoJoined: false,
                 playerOneHand: JSON.stringify(playerOneHand),
                 playerTwoHand: JSON.stringify(playerTwoHand),
                 playerOnePlayedFirstTurn: false,
                 playerTwoPlayedFirstTurn: false,
+                playsRemaining: 0,
                 remainingDeck: JSON.stringify(remainingDeck),
                 pendingMoves: JSON.stringify([]),
-                gameLog: JSON.stringify([])
+                gameLog: JSON.stringify([]),
+                gameOver: false,
+                initialPieces: existingGameData.initialPieces || 10,
+                playerOneColor: existingGameData.playerOneColor,
+                playerTwoColor: existingGameData.playerTwoColor,
+                coordinates: existingGameData.coordinates,
+                zoom: existingGameData.zoom,
+                basemap: existingGameData.basemap,
+                cumulativeScore: existingGameData.cumulativeScore || JSON.stringify({playerOne: 0, playerTwo: 0})
             }).then(() => {
                 console.log("Restarting game successfully!");
                 window.location.reload();

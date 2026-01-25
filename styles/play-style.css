@@ -454,11 +454,14 @@ body {
 
 .direction-buttons-container {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
-    gap: 10px;
-    width: 180px;
+    grid-template-columns: repeat(3, 40px);
+    grid-template-rows: repeat(3, 40px);
+    gap: 6px;
+    width: 120px;
+    height: 120px;
     margin: 20px auto;
+    place-items: center;
+    position: relative;
 }
 
 .direction-btn-north {
@@ -481,16 +484,24 @@ body {
     grid-row: 2;
 }
 
+.compass-icon {
+    height: 35px;
+    width: 35px;
+    grid-column: 2;
+    grid-row: 2;
+    pointer-events: none;
+}
+
 .direction-btn {
     padding: 0;
-    font-size: 18px;
+    font-size: 12px;
     font-weight: bold;
     background: #667eea;
     color: white;
     border: none;
     border-radius: 50%;
-    width: 50px;
-    height: 50px;
+    width: 28px;
+    height: 28px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -502,7 +513,9 @@ body {
 }
 
 .layer-graphic {
-    display: inline-block;
+    display: flex; 
+    align-items: center;
+    justify-content: center;
     width: 30px;
     height: 30px;
     margin-right: 8px;
@@ -513,6 +526,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
+}
+
+.layer-graphic svg {
+    display: block;
+    margin: 0 auto;
 }
 
 .layer-graphic-point {
@@ -615,4 +634,158 @@ body {
     #cards-area {
         max-height: 35vh;
     }
+}
+
+/* Game Over Screen Styles */
+#choice-content.game-over-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background-color: transparent;
+    color: white;
+    border-radius: 0;
+    padding: 30px;
+    max-width: 600px;
+}
+
+#choice-content.game-over-container h2 {
+    text-align: center;
+    font-size: 28px;
+    margin: 0;
+    color: white;
+}
+
+.game-over-content {
+    display: flex;
+    gap: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid white;
+}
+
+.player-score-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 15px;
+    border-radius: 0;
+    background: transparent;
+    border-left: 3px solid;
+}
+
+.player-score-column h3 {
+    text-align: center;
+    margin: 0;
+    font-size: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid white;
+}
+
+.score-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: white;
+}
+
+.score-label {
+    font-weight: 600;
+    color: #ccc;
+}
+
+.score-value {
+    font-weight: bold;
+    color: white;
+}
+
+.final-score {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid white;
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+}
+
+.game-over-winner {
+    text-align: center;
+    padding: 20px;
+    background: transparent;
+    color: white;
+    border-radius: 0;
+    font-size: 20px;
+    font-weight: bold;
+    border-top: 2px solid white;
+    padding-top: 20px;
+}
+
+.game-over-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* Layer Button Styles */
+.layer-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Card Selection Grid Styles */
+.card-selection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.collaboration-selection-title {
+    margin-bottom: 20px;
+}
+
+.collaboration-card-clickable {
+    cursor: pointer;
+}
+
+.collaboration-selection-hidden {
+    display: none;
+}
+
+/* Collaboration Reveal Card Styles */
+.collaboration-reveal-card {
+    background-color: white;
+    color: #333;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.collaboration-card-title {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.collaboration-card-description {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Collaboration Button Container */
+.collaboration-reveal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* Cumulative Score Styles */
+.cumulative-score-div {
+    text-align: center;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid white;
+    color: white;
 }

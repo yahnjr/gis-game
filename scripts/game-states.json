@@ -2,27 +2,30 @@
   "game-states": {
     "game-xxxxx": {
       "basemap": "imagery",
-      "coordinates": "[-15,-60]",
+      "coordinates": "[20,0]",
+      "cumulativeScore": "{\"playerOne\":0,\"playerTwo\":0}",
       "currentPlayer": 1,
       "discardPile": "[]",
       "gameId": "xxxxx",
-      "gameLog": "[]",
-      "gameState": "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]",
-      "lastPlayedCard": 99,
-      "lastPlayedCardPlayer": 1,
+      "gameLog": "[\"20:15 Player 1 auto-selected Player's First Turn\",\"20:15 Opening Moves: Placed feature at square 53\",\"20:15 Opening Moves: Placed feature at square 52\",\"20:15 Opening Moves: Placed feature at square 63\",\"20:15 Opening Moves: Placed feature at square 62\",\"20:15 Opening Moves: Placed feature at square 72\",\"20:15 Player 1 played Player's First Turn\",\"20:15 Player 1 has completed their first turn!\",\"20:15 Switched to Player 2's turn\",\"20:15 Player 2 selected Project\",\"20:16 Chosen Direction: South\",\"20:16 Project: Moved all pieces South\",\"20:16 Player 2 played Project\",\"20:16 Switched to Player 1's turn\",\"20:18 Player 1 selected Turn Off Layer\",\"20:18 Chosen Layer Type: Lines\",\"20:18 Turn Off Layer: Removed 0 Lines\",\"20:18 Player 1 played Turn Off Layer\",\"20:18 Switched to Player 2's turn\",\"20:18 Player 2 selected Project\",\"20:19 Chosen Direction: North\",\"20:19 Project: Moved all pieces North\",\"20:19 Player 2 played Project\",\"20:19 Switched to Player 1's turn\",\"20:19 Player 1 has no cards left, skipping turn\",\"20:19 Player 1 played No Card\",\"20:19 Switched to Player 2's turn\"]",
+      "gameOver": false,
+      "gameState": "[0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]",
+      "initialPieces": 5,
+      "lastPlayedCard": -1,
+      "lastPlayedCardPlayer": 99,
       "pendingMoves": "[]",
-      "playerOneColor": "rgba(227, 239, 5, 1)",
-      "playerOneHand": "[13,6,7,9,10,21,99]",
+      "playerOneColor": "rgba(252, 34, 204, 1)",
+      "playerOneHand": "[7,9,12]",
       "playerOneJoined": true,
-      "playerOnePlayedFirstTurn": false,
+      "playerOnePlayedFirstTurn": true,
       "playerTwoColor": "rgba(0, 0, 255, 1)",
-      "playerTwoHand": "[11,12,15,18,19,20,99]",
+      "playerTwoHand": "[14,15,20]",
       "playerTwoJoined": true,
       "playerTwoPlayedFirstTurn": false,
       "playsRemaining": 0,
       "previousState": "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]",
-      "remainingDeck": "[16,18,1,17,11,19,12,14,10,8]",
-      "zoom": 3
+      "remainingDeck": "[10,5,2,12,17,20,18,14,15,11,19,1,9,4,3,8,6,21,16]",
+      "zoom": 2
     }
   }
 }
