@@ -308,7 +308,54 @@ const cardTypes = {
         description: "Add a piece to all of your line and polygon features.",
         executionType: "spatial-join",
         execute: function(board, startSquare, player, isValidMove) {
-            if (!board.spatialJoinValidSquares || !board.spatialJoinValidSquares.has(startSquare)) {
+            if (!board.spatialJoinValidSquares || !board.spatialJoinFeatures || !board.spatialJoinUsedFeatures) {
+                addLog("Re-initializing Spatial Join data after sync...");
+                
+                const visited = new Set();
+                const features = [];
+                
+                board.forEach((space, index) => {
+                    if (space === player && !visited.has(index)) {
+                        const polygon = determinePolygon(board, index, player);
+                        const line = determineLine(board, index, player);
+                        
+                        if (polygon) {
+                            polygon.forEach(sq => visited.add(sq));
+                            features.push({ type: 'polygon', squares: polygon });
+                        } else if (line) {
+                            line.forEach(sq => visited.add(sq));
+                            features.push({ type: 'line', squares: line });
+                        }
+                    }
+                });
+                
+                board.spatialJoinFeatures = features;
+                board.spatialJoinUsedFeatures = board.spatialJoinUsedFeatures || [];
+                
+                const validSquares = {};
+                features.forEach((feature, featureIndex) => {
+                    if (!board.spatialJoinUsedFeatures.includes(featureIndex)) {
+                        feature.squares.forEach(square => {
+                            const neighbors = feature.type === 'polygon' 
+                                ? [square - 1, square + 1, square - 10, square + 10]
+                                : [square - 1, square + 1, square - 9, square + 9, square - 10, square - 11, square + 10, square + 11];
+                            
+                            neighbors.forEach(neighbor => {
+                                if (isValidMove(square, neighbor) && board[neighbor] === 0) {
+                                    validSquares[String(neighbor)] = featureIndex;
+                                }
+                            });
+                        });
+                    }
+                });
+                
+                board.spatialJoinValidSquares = validSquares;
+                console.log('Reconstructed valid squares:', validSquares);
+            }
+            
+            const squareKey = String(startSquare);
+            
+            if (!(squareKey in board.spatialJoinValidSquares)) {
                 addLog("Must place piece adjacent to a highlighted feature");
                 return false;
             }
@@ -317,24 +364,34 @@ const cardTypes = {
                 addLog("Square already occupied");
                 return false;
             } 
-
-            const featureIndex = board.spatialJoinValidSquares.get(startSquare);
             
-            if (!board.spatialJoinUsedFeatures) {
-                board.spatialJoinUsedFeatures = new Set();
+            const featureIndex = board.spatialJoinValidSquares[squareKey];
+            
+            if (!board.spatialJoinUsedFeatures.includes(featureIndex)) {
+                board.spatialJoinUsedFeatures.push(featureIndex);
             }
-            board.spatialJoinUsedFeatures.add(featureIndex);
-            
-            const squaresToRemove = [];
-            board.spatialJoinValidSquares.forEach((fIndex, square) => {
-                if (fIndex === featureIndex) {
-                    squaresToRemove.push(square);
-                }
-            });
-            squaresToRemove.forEach(sq => board.spatialJoinValidSquares.delete(sq));
             
             board[startSquare] = player;
-
+            
+            const newValidSquares = {};
+            board.spatialJoinFeatures.forEach((feature, fIndex) => {
+                if (!board.spatialJoinUsedFeatures.includes(fIndex)) {
+                    feature.squares.forEach(square => {
+                        const neighbors = feature.type === 'polygon' 
+                            ? [square - 1, square + 1, square - 10, square + 10]
+                            : [square - 1, square + 1, square - 9, square + 9, square - 10, square - 11, square + 10, square + 11];
+                        
+                        neighbors.forEach(neighbor => {
+                            if (isValidMove(square, neighbor) && board[neighbor] === 0) {
+                                newValidSquares[String(neighbor)] = fIndex;
+                            }
+                        });
+                    });
+                }
+            });
+            
+            board.spatialJoinValidSquares = newValidSquares;
+            
             addLog(`Spatial Join: Placed piece at square ${startSquare} for feature ${featureIndex + 1}`);
             return board;
         }   
@@ -363,7 +420,7 @@ const cardTypes = {
         execute: function(board, startSquare, player, isValidMove) {
             pendingMoves.push(["crunch", player]);
             addLog(`Crunch Time: Player ${player} will choose a card at end of game`);
-            return board;
+            return true;
         }    
     },
 
@@ -457,61 +514,57 @@ const cardTypes = {
             const chosenCardId = await createDiscardChoiceModal();
             
             if (chosenCardId) {
+                const discardIndex = discardPile.findIndex(item => item.cardId === chosenCardId);
+                if (discardIndex !== -1) {
+                    discardPile.splice(discardIndex, 1);
+                }
+                
                 const chosenCard = getCardById(chosenCardId);
-                selectCard(chosenCard);
+                chosenCard.fromCtrlZ = true;
+                
+                addLog(`Ctrl+Z: Using ${chosenCard.name} from discard pile`);
+                await selectCard(chosenCard);
+                
+                return true;
             }
 
-            return board;
+            return false;
         }
     },
 
     collaboration: {
-        cardId: 19,
-        name: "Collaboration",
-        description: "Choose one of your opponent's cards to reveal. Choose whether to use it for yourself or force a discard. If the opposing player is out of cards, use the top card from the remaining deck.",
-        executionType: "choice-opponent-card",
-        execute: async function(board, startSquare, player, isValidMove) {
-            const opponent = player === 1 ? 2 : 1;
-            const opponentHand = opponent === 1 ? playerOneHand : playerTwoHand;
-            
-            if (opponentHand.length === 0) {
-                addLog("Opponent has no cards, using top card from remaining deck");
-                if (remainingDeck.length != 0) {
-                    const topCard = remainingDeck.pop();
-                    opponentHand.push(topCard);
-                }
-
-                return board;
+    cardId: 19,
+    name: "Collaborate",
+    description: "Choose one of your opponent's cards to reveal. You may then play this card for yourself without removing it from their hand. If the opposing player is out of cards, use the top card from the remaining deck.",
+    executionType: "choice-opponent-card",
+    execute: async function(board, startSquare, player, isValidMove) {
+        const opponent = player === 1 ? 2 : 1;
+        const opponentHand = opponent === 1 ? playerOneHand : playerTwoHand;
+        
+        if (opponentHand.length === 0) {
+            addLog("Opponent has no cards, using top card from remaining deck");
+            if (remainingDeck.length != 0) {
+                const topCard = remainingDeck.pop();
+                opponentHand.push(topCard);
+            } else {
+                addLog("No cards available to collaborate with");
+                return false;
             }
-            
-            const result = await createCollaborationModal(opponentHand, opponent);
-            
-            if (result) {
-                const { cardId, action } = result;
-                
-                if (action === 'use') {
-                    const card = getCardById(cardId);
-                    addLog(`Using opponent's card: ${card.name}`);
-                    
-                    const cardIndex = opponentHand.indexOf(cardId);
-                    opponentHand.splice(cardIndex, 1);
-                    
-                    await selectCard(card);
-                    
-                } else if (action === 'discard') {
-                    addLog(`Forcing opponent to discard card ${cardId}`);
-                    
-                    const cardIndex = opponentHand.indexOf(cardId);
-                    opponentHand.splice(cardIndex, 1);
-                    discardPile.push(cardId);
-                    
-                    updateFirebase();
-                }
-            }
-            
-            return board;
-        }    
-    },
+        }
+        
+        const result = await createCollaborationModal(opponentHand, opponent);
+        
+        if (result && result.shouldUseCard) {
+            return { 
+                useCard: true, 
+                cardId: result.cardId 
+            };
+        }
+        
+        addLog("Collaboration: Card revealed but not used");
+        return true;
+    }    
+},
 
     modelBuilder: {
         cardId: 20,
@@ -521,17 +574,18 @@ const cardTypes = {
         execute: async function(board, startSquare, player, isValidMove) {
             if (remainingDeck.length === 0) {
                 addLog("No cards in remaining deck");
-                return board;
-            };
-
-            const chosenCardId = await createDeckChoiceModal(5);
-
+                return false;
+            }
+            
+            const chosenCardId = await createDeckChoiceModal(5, 'Model Builder');
             if (chosenCardId) {
                 pendingMoves.push(["modelBuilder", [player, chosenCardId]]);
                 addLog(`Model Builder: Card ${chosenCardId} queued for player ${player} at end of game`);
+                return true;
             }
-
-            return board;
+            
+            addLog("Model Builder: No card selected");
+            return false;
         }
     },
 
@@ -753,8 +807,10 @@ function turnOffLayer(newBoard, layerType, player) {
     const opponent = player === 1 ? 2 : 1;
 
     newBoard.forEach((space, index) => {
-        polygonPlayerMembers = determinePolygon(newBoard, index, player);
-        polygonOpponentMembers = determinePolygon(newBoard, index, opponent);
+        if (space === 0) return;
+
+        const polygonPlayerMembers = determinePolygon(newBoard, index, player);
+        const polygonOpponentMembers = determinePolygon(newBoard, index, opponent);
 
         if (polygonPlayerMembers) {
             polygonPlayerMembers.forEach(member => allPolygons.add(member));
@@ -762,13 +818,18 @@ function turnOffLayer(newBoard, layerType, player) {
             polygonOpponentMembers.forEach(member => allPolygons.add(member));
         }
 
-        linePlayerMembers = determineLine(newBoard, index, player);
-        lineOpponentMembers = determineLine(newBoard, index, opponent);
+        const linePlayerMembers = determineLine(newBoard, index, player);
+        const lineOpponentMembers = determineLine(newBoard, index, opponent);
+        
         if (linePlayerMembers) {
             linePlayerMembers.forEach(member => allLines.add(member));
-        }   else if (lineOpponentMembers) {
+        } else if (lineOpponentMembers) {
             lineOpponentMembers.forEach(member => allLines.add(member));
-        } else if (space != 0) {
+        }
+    });
+
+    newBoard.forEach((space, index) => {
+        if (space !== 0 && !allPolygons.has(index) && !allLines.has(index)) {
             remainingPoints.add(index);
         }
     });

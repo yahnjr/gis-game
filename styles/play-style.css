@@ -152,6 +152,23 @@ body {
     justify-content: center;
 }
 
+.pending-moves-container {
+    width: 60px;
+    height: 80px;
+    margin: 0 auto;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.pending-move-card {
+    position: absolute;
+    width: 60px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
 #middle-area {
     flex: 1;
     position: relative;
@@ -191,6 +208,11 @@ body {
 
 .board-space.highlight-change {
     box-shadow: 0 0 8px 2px rgba(255, 215, 0, 0.8);
+    border: 2px solid gold;
+}
+
+.board-space.highlight-available {
+    box-shadow: 0 0 8px 2px rgba(115, 239, 78, 0.8);
     border: 2px solid gold;
 }
 
@@ -391,6 +413,28 @@ body {
     align-items: center;
     gap: 20px;
     margin-bottom: 20px;
+}
+
+.card-selector-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.card-selector-location {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card-selector-action {
+    font-size: 14px;
+    color: #ccc;
+    font-weight: 600;
 }
 
 .nav-button {

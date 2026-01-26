@@ -77,11 +77,21 @@
         </div>
     </div>
 
+    <div id="browse-toolkit-modal" class="modal browse-toolkit-modal">
+        <div class="browse-toolkit-header">
+            <h2>GIS Toolkit - All Cards</h2>
+            <button id="close-browse-toolkit" class="close-browse-btn">✕</button>
+        </div>
+        <div id="toolkit-cards-grid" class="toolkit-cards-grid">
+        </div>
+    </div>
+
     <script src='https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js'></script>
     <script src='https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'></script>
     <script src='scripts/firebase-config.js'></script>
     <script src='scripts/basemaps.js'></script>
     <script src='scripts/game-setup.js'></script>
+    <script src='scripts/card-mechanics.js'></script>
     <script>
         let db;
         firebase.initializeApp(firebaseConfig);
@@ -233,8 +243,7 @@
         };
         
         document.getElementById('browse-button').onclick = function() {
-            console.log("Browsing the GIS Toolkit...");
-            // TODO: Navigate to toolkit browser page
+            openBrowseToolkitModal();
         };
         
         document.getElementById('confirm-start-game').onclick = function() {
@@ -267,6 +276,7 @@
         function closeModals() {
             document.getElementById('start-game-modal').style.display = 'none';
             document.getElementById('join-game-modal').style.display = 'none';
+            document.getElementById('browse-toolkit-modal').style.display = 'none';
             document.getElementById('modal-overlay').style.display = 'none';
             document.getElementById('join-error').style.display = 'none';
             
@@ -275,6 +285,46 @@
                 boardMap = null;
             }
         }
+
+        function openBrowseToolkitModal() {
+            document.getElementById('browse-toolkit-modal').style.display = 'block';
+            document.getElementById('modal-overlay').style.display = 'block';
+            populateToolkitGrid();
+        }
+
+        function populateToolkitGrid() {
+            const grid = document.getElementById('toolkit-cards-grid');
+            grid.innerHTML = '';
+
+            for (const [key, card] of Object.entries(cardTypes)) {
+                const cardElement = createToolkitCardElement(card);
+                grid.appendChild(cardElement);
+            }
+        }
+
+        function createToolkitCardElement(card) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'toolkit-card';
+
+            const cardId = document.createElement('div');
+            cardId.className = 'toolkit-card-id';
+
+            const title = document.createElement('div');
+            title.className = 'toolkit-card-title';
+            title.textContent = card.name;
+            cardDiv.appendChild(title);
+
+            const description = document.createElement('div');
+            description.className = 'toolkit-card-description';
+            description.textContent = card.description;
+            cardDiv.appendChild(description);
+
+            return cardDiv;
+        }
+
+        document.getElementById('close-browse-toolkit').onclick = function() {
+            closeModals();
+        };
     </script>
 </body>
 </html>

@@ -134,6 +134,53 @@ function updateDeckIndicators() {
             deckIndicator.appendChild(cardEl);
         }
     }
+
+    updatePendingMovesDisplay();
+}
+
+function updatePendingMovesDisplay() {
+    const pendingMovesContainer = document.getElementById('pending-moves-container');
+    if (!pendingMovesContainer) return;
+    
+    pendingMovesContainer.innerHTML = '';
+    
+    if (pendingMoves.length === 0) {
+        return;
+    }
+
+    pendingMoves.forEach((move, index) => {
+        const moveType = move[0];
+        let cardId, cardName, playerColor;
+
+        if (moveType === 'modelBuilder') {
+            cardId = move[1][1];
+            cardName = 'Model Builder';
+            const player = move[1][0];
+            playerColor = player === 1 ? playerOneColor : playerTwoColor;
+        } else if (moveType === 'crunch') {
+            cardId = 14;
+            cardName = 'Crunch Time';
+            const player = move[1];
+            playerColor = player === 1 ? playerOneColor : playerTwoColor;
+        }
+
+        const cardEl = document.createElement('div');
+        cardEl.classList.add('card-back', 'pending-move-card');
+        cardEl.style.backgroundColor = playerColor;
+        cardEl.style.left = (index * 15) + 'px';
+        cardEl.style.zIndex = index;
+        
+        const img = document.createElement('img');
+        img.src = '../styles/gis-battle.svg';
+        img.alt = 'GIS Battle Logo';
+        
+        const label = document.createElement('h3');
+        label.textContent = cardName;
+        
+        cardEl.appendChild(img);
+        cardEl.appendChild(label);
+        pendingMovesContainer.appendChild(cardEl);
+    });
 }
 
 displayCurrentCard = function(card) {
@@ -296,7 +343,20 @@ async function selectCard(card) {
         }
         endTurn(card);
     } else if (card.executionType === "choice-discard") {
-        await card.execute(currentState, null, currentPlayer, isValidMove);
+        let result = await card.execute(currentState, null, currentPlayer, isValidMove);
+    
+        let currentHand = currentPlayer === 1 ? playerOneHand : playerTwoHand;
+        const cardIndex = currentHand.indexOf(card.cardId);
+        if (cardIndex !== -1) {
+            currentHand.splice(cardIndex, 1);
+        }
+        
+        const alreadyInDiscard = discardPile.some(item => 
+            item.cardId === card.cardId && item.player === currentPlayer
+        );
+        if (!alreadyInDiscard) {
+            discardPile.push({ cardId: card.cardId, player: currentPlayer });
+        }
     } else if (card.executionType === "choice-deck-5") {
         let result = await card.execute(currentState, null, currentPlayer, isValidMove);
         endTurn(card);
@@ -305,7 +365,32 @@ async function selectCard(card) {
         endTurn(card);
     } else if (card.executionType === "choice-opponent-card") {
         let result = await card.execute(currentState, null, currentPlayer, isValidMove);
-        endTurn(card);
+        
+        if (result && result.useCard) {
+            const revealedCard = getCardById(result.cardId);
+            revealedCard.fromCollaboration = true;
+            
+            let currentHand = currentPlayer === 1 ? playerOneHand : playerTwoHand;
+            const cardIndex = currentHand.indexOf(card.cardId);
+            if (cardIndex !== -1) {
+                currentHand.splice(cardIndex, 1);
+            }
+            
+            if (!card.fromCtrlZ && !card.fromCollaboration) {
+                const alreadyInDiscard = discardPile.some(item => 
+                    item.cardId === card.cardId && item.player === currentPlayer
+                );
+                if (!alreadyInDiscard) {
+                    discardPile.push({ cardId: card.cardId, player: currentPlayer });
+                }
+            }
+            
+            addLog(`Player ${currentPlayer} played ${card.name}`);
+            
+            await selectCard(revealedCard);
+        } else {
+            endTurn(card);
+        }
     } else if (card.executionType === "ground-truth") {
         playsRemaining = card.movesRemaining;
         groundTruthFirstClick = null;
@@ -326,16 +411,16 @@ function setupFirebaseListeners() {
             const gameStateKey = Object.keys(data)[0];
             const gameData = data[gameStateKey];
 
-            // if (playerId === 1 && gameData.playerOneJoined) {
-            //     alert('Player 1 slot is already taken!');
-            //     window.location.href = '../index.html';
-            //     return;
-            // }
-            // if (playerId === 2 && gameData.playerTwoJoined) {
-            //     alert('Player 2 slot is already taken!');
-            //     window.location.href = '../index.html';
-            //     return;
-            // }
+            if (playerId === 1 && gameData.playerOneJoined) {
+                alert('Player 1 slot is already taken!');
+                window.location.href = '../index.html';
+                return;
+            }
+            if (playerId === 2 && gameData.playerTwoJoined) {
+                alert('Player 2 slot is already taken!');
+                window.location.href = '../index.html';
+                return;
+            }
 
             const updateData = {};
             if (playerId === 1) {
@@ -620,7 +705,7 @@ function showMagnifiedCard(card) {
     showCardSelector(playerHand, currentIndex, 'hand');
 }
 
-function showCardSelector(cardArray, startIndex, context) {
+function showCardSelector(cardArray, startIndex, context, contextDetails = {}) {
     const existingOverlay = document.getElementById('board-overlay');
     if (existingOverlay) {
         existingOverlay.remove();
@@ -630,6 +715,38 @@ function showCardSelector(cardArray, startIndex, context) {
 
     const overlay = document.createElement('div');
     overlay.id = 'board-overlay';
+
+    let locationLabel = '';
+    let actionLabel = '';
+    
+    if (context === 'hand') {
+        locationLabel = 'Player Hand';
+        actionLabel = 'Choose a card to play';
+    } else if (context === 'opponent-use' || context === 'opponent-discard') {
+        locationLabel = "Opponent's Hand";
+        actionLabel = 'Collaboration';
+    } else if (context === 'discard') {
+        locationLabel = 'Discard Pile';
+        actionLabel = 'Ctrl+Z';
+    } else if (context === 'deck') {
+        locationLabel = 'Remaining Deck';
+        actionLabel = contextDetails.actionLabel || 'Choose a card';
+    }
+
+    const labelsContainer = document.createElement('div');
+    labelsContainer.className = 'card-selector-labels';
+
+    const locationLabelEl = document.createElement('div');
+    locationLabelEl.className = 'card-selector-location';
+    locationLabelEl.innerText = locationLabel;
+    labelsContainer.appendChild(locationLabelEl);
+
+    const actionLabelEl = document.createElement('div');
+    actionLabelEl.className = 'card-selector-action';
+    actionLabelEl.innerText = actionLabel;
+    labelsContainer.appendChild(actionLabelEl);
+
+    overlay.appendChild(labelsContainer);
 
     const cardContainer = document.createElement('div');
     cardContainer.className = 'card-selector-container';
@@ -848,30 +965,23 @@ function executeCard(clickedSquare) {
         return;
     }
 
-    if (card.executionType === "spatial-join") {
+    if (card.executionType === "spatial-join") {        
         let result = card.execute(currentState, clickedSquare, currentPlayer, isValidMove);
-    
+
         if (result !== false) {
             currentState = result;
             setBoardState(currentState, playerOneColor, playerTwoColor);
             playsRemaining--;
             
-            if (currentState.spatialJoinFeatures) {
-                currentState.spatialJoinFeatures.forEach((feature, index) => {
-                    if (!currentState.spatialJoinUsedFeatures.has(index)) {
-                        feature.squares.forEach(square => {
-                            document.getElementById(`board-space${square}`).classList.add('highlight-change');
-                        });
-                    }
-                });
+            if (playsRemaining > 0 && currentState.spatialJoinValidSquares) {
+                const validSquareNumbers = Object.keys(currentState.spatialJoinValidSquares).map(sq => parseInt(sq));
+                highlightAvailableMoves(validSquareNumbers);
             }
 
             updateFirebase();
             
             if (playsRemaining === 0) {
-                document.querySelectorAll('.board-space').forEach(space => {
-                    space.classList.remove('highlight-change');
-                });
+                clearAvailableMoves();
                 delete currentState.spatialJoinValidSquares;
                 delete currentState.spatialJoinFeatures;
                 delete currentState.spatialJoinUsedFeatures;
@@ -969,12 +1079,27 @@ function endTurn(card) {
     let currentHand = currentPlayer === 1 ? playerOneHand : playerTwoHand;
     const cardIndex = currentHand.indexOf(card.cardId);
     const endTurnBtn = document.getElementById('end-turn-early-button');
-    currentHand.splice(cardIndex, 1);
+
+    clearAvailableMoves();
+    
+    if (cardIndex !== -1) {
+        currentHand.splice(cardIndex, 1);
+    }
+    
     lastPlayedCard = card.cardId;
     lastPlayedCardPlayer = currentPlayer;
+    
     if (card.cardId !== 99) {
-        discardPile.push({ cardId: card.cardId, player: currentPlayer });
+        if (!card.fromCtrlZ && !card.fromCollaboration) {
+            const alreadyInDiscard = discardPile.some(item => 
+                item.cardId === card.cardId && item.player === currentPlayer
+            );
+            if (!alreadyInDiscard) {
+                discardPile.push({ cardId: card.cardId, player: currentPlayer });
+            }
+        }
     }
+    
     addLog(`Player ${currentPlayer} played ${card.name}`);
 
     if (card.cardId === 99) {
@@ -1040,6 +1165,25 @@ function highlightChanges(newState, oldState) {
             gameSpace.classList.add('highlight-change');
         }
     }
+}
+
+function highlightAvailableMoves(squares) {
+    clearAvailableMoves();
+    
+    if (!squares || squares.length === 0) return;
+    
+    squares.forEach(square => {
+        const gameSpace = document.getElementById(`board-space${square}`);
+        if (gameSpace) {
+            gameSpace.classList.add('highlight-available');
+        }
+    });
+}
+
+function clearAvailableMoves() {
+    document.querySelectorAll('.board-space').forEach(space => {
+        space.classList.remove('highlight-available');
+    });
 }
 
 function createChoiceModal(choiceType) {
@@ -1184,7 +1328,7 @@ function createDiscardChoiceModal() {
     });
 }
 
-function createDeckChoiceModal(numberOfCards) {
+function createDeckChoiceModal(numberOfCards, contextLabel = null) {
     return new Promise((resolve) => {
         window.cardSelectorResolve = resolve;
 
@@ -1197,7 +1341,8 @@ function createDeckChoiceModal(numberOfCards) {
             return;
         }
 
-        showCardSelector(topCards, 0, 'deck');
+        const contextDetails = { actionLabel: contextLabel || 'Choose a card' };
+        showCardSelector(topCards, 0, 'deck', contextDetails);
     });
 }
 
@@ -1273,22 +1418,28 @@ async function createCollaborationModal(opponentHand, opponentPlayer) {
             useButton.className = 'action-button';
             useButton.innerText = 'Use This Card';
             useButton.addEventListener('click', function() {
-                addLog(`Using opponent's card`);
+                addLog(`Using opponent's card: ${card.name}`);
                 overlay.remove();
-                resolve({ cardId: selectedCardId, action: 'use' });
+                resolve({ 
+                    cardId: selectedCardId, 
+                    shouldUseCard: true 
+                });
             });
 
-            const discardButton = document.createElement('button');
-            discardButton.className = 'action-button discard-action';
-            discardButton.innerText = 'Discard This Card';
-            discardButton.addEventListener('click', function() {
-                addLog(`Forcing opponent to discard card`);
+            const closeButton = document.createElement('button');
+            closeButton.className = 'cancel-button';
+            closeButton.innerText = 'Just Look';
+            closeButton.addEventListener('click', function() {
+                addLog(`Revealed opponent's card: ${card.name}`);
                 overlay.remove();
-                resolve({ cardId: selectedCardId, action: 'discard' });
+                resolve({ 
+                    cardId: selectedCardId, 
+                    shouldUseCard: false 
+                });
             });
 
             buttonContainer.appendChild(useButton);
-            buttonContainer.appendChild(discardButton);
+            buttonContainer.appendChild(closeButton);
 
             revealContainer.appendChild(magnifiedCard);
             revealContainer.appendChild(buttonContainer);
@@ -1325,9 +1476,9 @@ function initializeSpatialJoin() {
     }
     
     currentState.spatialJoinFeatures = features;
-    currentState.spatialJoinUsedFeatures = new Set();
+    currentState.spatialJoinUsedFeatures = [];
     
-    const validSquares = new Map();
+    const validSquares = {};
     
     features.forEach((feature, featureIndex) => {
         feature.squares.forEach(square => {
@@ -1337,20 +1488,19 @@ function initializeSpatialJoin() {
             
             neighbors.forEach(neighbor => {
                 if (isValidMove(square, neighbor) && currentState[neighbor] === 0) {
-                    validSquares.set(neighbor, featureIndex);
+                    validSquares[String(neighbor)] = featureIndex;
                 }
             });
-        });
-        
-        feature.squares.forEach(square => {
-            document.getElementById(`board-space${square}`).classList.add('highlight-change');
         });
     });
     
     currentState.spatialJoinValidSquares = validSquares;
     playsRemaining = features.length;
     
-    addLog(`Spatial Join: ${features.length} feature(s) found`);
+    const validSquareNumbers = Object.keys(validSquares).map(sq => parseInt(sq));
+    highlightAvailableMoves(validSquareNumbers);
+    
+    addLog(`Spatial Join: ${features.length} feature(s) found. Place pieces in highlighted squares.`);
 }
 
 function validateHotspotPolygon() {
@@ -1585,47 +1735,98 @@ function displayGameOverScreen(scores, winner) {
 async function processPendingMoves() {
     addLog("Processing all pending moves...");
     
-    for (const move of pendingMoves) {
+    for (let i = 0; i < pendingMoves.length; i++) {
+        const move = pendingMoves[i];
         const moveType = move[0];
+        
+        addLog(`Processing pending move ${i + 1}/${pendingMoves.length}: ${moveType}`);
         
         if (moveType === 'modelBuilder') {
             const player = move[1][0];
             const cardId = move[1][1];
             
-            addLog(`Processing Model Builder for Player ${player} with card ${cardId}`);
+            addLog(`Model Builder for Player ${player} with card ${cardId}`);
             
-            const card = getCardById(cardId);
-            if (card && playerId === player) {
-                await executeEndGameCard(card, player);
-            } else if (card) {
-                addLog(`Waiting for Player ${player} to execute their Model Builder card...`);
+            if (playerId === player) {
+                const card = getCardById(cardId);
+                if (card) {
+                    await executeEndGameCard(card, player);
+                } else {
+                    addLog(`ERROR: Card ${cardId} not found`);
+                }
+            } else {
+                addLog(`Waiting for Player ${player} to complete Model Builder...`);
+                await waitForPlayerToComplete(player, 'modelBuilder', i);
             }
             
         } else if (moveType === 'crunch') {
             const player = move[1];
             
-            addLog(`Processing Crunch Time for Player ${player}`);
+            addLog(`Crunch Time for Player ${player}`);
 
             if (playerId === player) {
-                const chosenCardId = await createDeckChoiceModal(3);
+                const chosenCardId = await createDeckChoiceModal(3, 'Crunch Time');
                 if (chosenCardId) {
                     const card = getCardById(chosenCardId);
                     if (card) {
                         await executeEndGameCard(card, player);
+                    } else {
+                        addLog(`ERROR: Card ${chosenCardId} not found`);
                     }
+                } else {
+                    addLog(`Player ${player} cancelled Crunch Time card selection`);
                 }
             } else {
-                addLog(`Waiting for Player ${player} to choose their Crunch Time card...`);
+                addLog(`Waiting for Player ${player} to complete Crunch Time...`);
+                await waitForPlayerToComplete(player, 'crunch', i);
             }
         }
     }
     
     pendingMoves = [];
     updateFirebase();
+    addLog("All pending moves processed");
+}
+
+function waitForPlayerToComplete(player, moveType, moveIndex) {
+    return new Promise((resolve) => {
+        addLog(`Monitoring for Player ${player}'s ${moveType} completion...`);
+        
+        const checkInterval = setInterval(() => {
+            gameStatesRef.orderByChild('gameId').equalTo(gameId).once('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const gameStateKey = Object.keys(data)[0];
+                    const gameData = data[gameStateKey];
+                    const remotePendingMoves = JSON.parse(gameData.pendingMoves || '[]');
+                    
+                    if (remotePendingMoves.length === 0 || 
+                        remotePendingMoves.length <= moveIndex ||
+                        gameData.gameState !== JSON.stringify(currentState)) {
+                        
+                        clearInterval(checkInterval);
+                        addLog(`Player ${player}'s ${moveType} appears complete`);
+                        
+                        currentState = JSON.parse(gameData.gameState);
+                        setBoardState(currentState, playerOneColor, playerTwoColor);
+                        
+                        resolve();
+                    }
+                }
+            });
+        }, 1000); 
+
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            addLog(`WARNING: Timeout waiting for Player ${player}'s ${moveType}`);
+            resolve();
+        }, 60000);
+    });
 }
 
 async function executeEndGameCard(card, player) {
     return new Promise((resolve) => {
+        console.log(`executeEndGameCard called for player ${player}, card ${card.name}`);
         addLog(`Player ${player} executing card: ${card.name}`);
         
         const modalOverlay = document.createElement('div');
@@ -1649,57 +1850,83 @@ async function executeEndGameCard(card, player) {
         continueButton.className = 'action-button';
         continueButton.innerText = 'Execute Card';
         continueButton.addEventListener('click', async function() {
+            console.log(`Execute button clicked for ${card.name}`);
             modalOverlay.remove();
             
             const originalPlayer = currentPlayer;
             currentPlayer = player;
             
-            if (card.executionType === "placement") {
-                selectedCard = card;
-                playsRemaining = card.numberOfPlays || 1;
-                await waitForCardCompletion();
-            } else if (card.executionType === "immediate") {
-                let result = card.execute(currentState, previousState, player);
-                if (result) {
-                    currentState = result;
-                    setBoardState(currentState, playerOneColor, playerTwoColor);
+            try {
+                if (card.executionType === "placement") {
+                    selectedCard = card;
+                    playsRemaining = card.numberOfPlays || 1;
+                    console.log(`Placement card: waiting for ${playsRemaining} plays`);
+                    await waitForCardCompletion();
+                    
+                } else if (card.executionType === "immediate") {
+                    console.log('Executing immediate card');
+                    let result = card.execute(currentState, previousState, player);
+                    if (result) {
+                        currentState = result;
+                        setBoardState(currentState, playerOneColor, playerTwoColor);
+                    }
+                    
+                } else if (card.executionType === "choice-direction") {
+                    console.log('Executing choice-direction card');
+                    const choice = await createChoiceModal("Direction");
+                    let result = card.execute(currentState, previousState, choice, player);
+                    if (result) {
+                        currentState = result;
+                        setBoardState(currentState, playerOneColor, playerTwoColor);
+                    }
+                    
+                } else if (card.executionType === "choice-layer") {
+                    console.log('Executing choice-layer card');
+                    const choice = await createChoiceModal("Layer Type");
+                    let result = card.execute(currentState, previousState, choice, player);
+                    if (result) {
+                        currentState = result;
+                        setBoardState(currentState, playerOneColor, playerTwoColor);
+                    }
+                    
+                } else if (card.executionType === "ground-truth") {
+                    selectedCard = card;
+                    playsRemaining = card.movesRemaining;
+                    groundTruthFirstClick = null;
+                    console.log(`Ground truth: waiting for ${playsRemaining} moves`);
+                    await waitForCardCompletion();
+                    
+                } else if (card.executionType === "spatial-join") {
+                    console.log('Executing spatial-join card');
+                    initializeSpatialJoin();
+                    await waitForCardCompletion();
+                    
+                } else if (card.executionType === "hotspot") {
+                    selectedCard = card;
+                    playsRemaining = card.movesRemaining;
+                    hotspotFirstClick = null;
+                    hotspotPhase = "initial";
+                    console.log(`Hotspot: waiting for ${playsRemaining} moves`);
+                    await waitForCardCompletion();
+                    
+                } else {
+                    console.log(`WARNING: Unknown execution type ${card.executionType}`);
                 }
-            } else if (card.executionType === "choice-direction") {
-                const choice = await createChoiceModal("Direction");
-                let result = card.execute(currentState, previousState, choice, player);
-                if (result) {
-                    currentState = result;
-                    setBoardState(currentState, playerOneColor, playerTwoColor);
-                }
-            } else if (card.executionType === "choice-layer") {
-                const choice = await createChoiceModal("Layer Type");
-                let result = card.execute(currentState, previousState, choice, player);
-                if (result) {
-                    currentState = result;
-                    setBoardState(currentState, playerOneColor, playerTwoColor);
-                }
-            } else if (card.executionType === "ground-truth") {
-                selectedCard = card;
-                playsRemaining = card.movesRemaining;
-                groundTruthFirstClick = null;
-                await waitForCardCompletion();
-            } else if (card.executionType === "spatial-join") {
-                initializeSpatialJoin();
-                await waitForCardCompletion();
-            } else if (card.executionType === "hotspot") {
-                selectedCard = card;
-                playsRemaining = card.movesRemaining;
-                hotspotFirstClick = null;
-                hotspotPhase = "initial";
-                await waitForCardCompletion();
+                
+                currentPlayer = originalPlayer;
+                updateFirebase();
+                
+                console.log(`Card execution complete for ${card.name}`);
+                await new Promise(r => setTimeout(r, 1000));
+                
+                resolve();
+                
+            } catch (error) {
+                console.error('Error executing end game card:', error);
+                addLog(`ERROR executing ${card.name}: ${error.message}`);
+                currentPlayer = originalPlayer;
+                resolve();
             }
-            
-            currentPlayer = originalPlayer;
-            updateFirebase();
-            
-            await new Promise(r => setTimeout(r, 1000));
-            
-            resolve();
         });
 
         messageContent.appendChild(messageTitle);
@@ -1712,13 +1939,26 @@ async function executeEndGameCard(card, player) {
 
 function waitForCardCompletion() {
     return new Promise((resolve) => {
+        console.log(`Waiting for card completion, playsRemaining: ${playsRemaining}`);
+        
         const checkInterval = setInterval(() => {
+            console.log(`Checking completion: playsRemaining = ${playsRemaining}`);
             if (playsRemaining === 0) {
                 clearInterval(checkInterval);
                 selectedCard = null;
+                console.log('Card completion detected');
                 resolve();
             }
         }, 100);
+        
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            console.log('WARNING: Card completion timeout');
+            addLog('WARNING: Card execution timed out');
+            selectedCard = null;
+            playsRemaining = 0;
+            resolve();
+        }, 300000);
     });
 }
 
