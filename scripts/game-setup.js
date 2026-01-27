@@ -34,6 +34,7 @@ function createGame(playerOneColor, numberOfCards, initialPieces, coordinates, z
         playerTwoColor: "rgba(0, 0, 255, 1)",
         playerOneJoined: false,
         playerTwoJoined: false,
+        handSize: numberOfCards,
         playerOneHand: JSON.stringify(playerOneHand),
         playerTwoHand: JSON.stringify(playerTwoHand),
         playerOnePlayedFirstTurn: false,
@@ -58,7 +59,7 @@ function createGame(playerOneColor, numberOfCards, initialPieces, coordinates, z
     });
 }
 
-function playAgain(gameId, numberOfCards) {
+function playAgain(gameId, numberOfCards, initialPieces) {
     let remainingDeck = Array.from({ length: deckLength }, (_, i) => i + 1);
     remainingDeck = shuffleArray(remainingDeck);
 
@@ -89,6 +90,7 @@ function playAgain(gameId, numberOfCards) {
                 lastPlayedCardPlayer: 1,
                 playerOneJoined: false,
                 playerTwoJoined: false,
+                handSize: numberOfCards,
                 playerOneHand: JSON.stringify(playerOneHand),
                 playerTwoHand: JSON.stringify(playerTwoHand),
                 playerOnePlayedFirstTurn: false,

@@ -12,6 +12,7 @@ let mapBasemap = 'imagery';
 let initialPieces = 10;
 let playerOneColor;
 let playerTwoColor;
+let handSize = 5;
 let playerOneHand = [];
 let playerTwoHand = [];
 let playerOnePlayedFirstTurn = false;
@@ -32,6 +33,9 @@ let hotspotPhase = "initial";
 let gameLog = [];
 let isListenerSetup = false;
 let isMapInitialized = false;
+let gameOverOverlay = null;
+let gameOverScores = null;
+let gameOverWinner = null;
 
 document.getElementById('game-id-display').textContent = `Game: ${gameId}`;
 
@@ -469,6 +473,7 @@ function setupGameStateListener() {
                 gameOver = gameData.gameOver || false;
                 cumulativeScore = gameData.cumulativeScore ? JSON.parse(gameData.cumulativeScore) : {playerOne: 0, playerTwo: 0};
 
+                handSize = gameData.handSize;
                 playerOneHand = JSON.parse(gameData.playerOneHand);
                 playerTwoHand = JSON.parse(gameData.playerTwoHand);
 
@@ -1627,8 +1632,16 @@ async function beginEndGame() {
 }
 
 function displayGameOverScreen(scores, winner) {
+    if (gameOverOverlay) {
+        return;
+    }
+    
+    gameOverScores = scores;
+    gameOverWinner = winner;
+    
     const modalOverlay = document.createElement('div');
     modalOverlay.id = 'board-overlay';
+    modalOverlay.classList.add('game-over-overlay');
 
     const resultContent = document.createElement('div');
     resultContent.id = 'choice-content';
@@ -1714,13 +1727,22 @@ function displayGameOverScreen(scores, winner) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'game-over-actions';
 
+    const minimizeButton = document.createElement('button');
+    minimizeButton.className = 'action-button';
+    minimizeButton.innerText = 'Inspect Board';
+    minimizeButton.addEventListener('click', function() {
+        toggleGameOverOverlay();
+    });
+    actionsDiv.appendChild(minimizeButton);
+
     if (playerId === 1) {
         const replayButton = document.createElement('button');
         replayButton.className = 'action-button';
         replayButton.innerText = 'Play Again';
         replayButton.addEventListener('click', function() {
+            gameOverOverlay = null;
             modalOverlay.remove();
-            playAgain(gameId, 5);
+            playAgain(gameId, handSize, initialPieces);
         });
 
         actionsDiv.appendChild(replayButton);
@@ -1730,6 +1752,45 @@ function displayGameOverScreen(scores, winner) {
     
     modalOverlay.appendChild(resultContent);
     document.body.appendChild(modalOverlay);
+    gameOverOverlay = modalOverlay;
+    
+    addGameOverReopenButton();
+}
+
+function toggleGameOverOverlay() {
+    if (gameOverOverlay) {
+        const isHidden = gameOverOverlay.style.display === 'none';
+        gameOverOverlay.style.display = isHidden ? 'flex' : 'none';
+        
+        const reopenBtn = document.getElementById('game-over-reopen-btn');
+        if (reopenBtn) {
+            reopenBtn.style.display = isHidden ? 'none' : 'block';
+        }
+    }
+}
+
+function addGameOverReopenButton() {
+    const topControls = document.getElementById('top-controls');
+    if (!topControls) return;
+    
+    if (document.getElementById('game-over-reopen-btn')) {
+        document.getElementById('game-over-reopen-btn').remove();
+    }
+    
+    const reopenContainer = document.createElement('div');
+    reopenContainer.className = 'control-item';
+    
+    const reopenBtn = document.createElement('button');
+    reopenBtn.id = 'game-over-reopen-btn';
+    reopenBtn.className = 'reopen-game-over-btn';
+    reopenBtn.innerText = 'View Results';
+    reopenBtn.style.display = 'none';
+    reopenBtn.addEventListener('click', function() {
+        toggleGameOverOverlay();
+    });
+    
+    reopenContainer.appendChild(reopenBtn);
+    topControls.appendChild(reopenContainer);
 }
 
 async function processPendingMoves() {

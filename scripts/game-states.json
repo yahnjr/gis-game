@@ -10,6 +10,7 @@
       "gameLog": "[\"20:15 Player 1 auto-selected Player's First Turn\",\"20:15 Opening Moves: Placed feature at square 53\",\"20:15 Opening Moves: Placed feature at square 52\",\"20:15 Opening Moves: Placed feature at square 63\",\"20:15 Opening Moves: Placed feature at square 62\",\"20:15 Opening Moves: Placed feature at square 72\",\"20:15 Player 1 played Player's First Turn\",\"20:15 Player 1 has completed their first turn!\",\"20:15 Switched to Player 2's turn\",\"20:15 Player 2 selected Project\",\"20:16 Chosen Direction: South\",\"20:16 Project: Moved all pieces South\",\"20:16 Player 2 played Project\",\"20:16 Switched to Player 1's turn\",\"20:18 Player 1 selected Turn Off Layer\",\"20:18 Chosen Layer Type: Lines\",\"20:18 Turn Off Layer: Removed 0 Lines\",\"20:18 Player 1 played Turn Off Layer\",\"20:18 Switched to Player 2's turn\",\"20:18 Player 2 selected Project\",\"20:19 Chosen Direction: North\",\"20:19 Project: Moved all pieces North\",\"20:19 Player 2 played Project\",\"20:19 Switched to Player 1's turn\",\"20:19 Player 1 has no cards left, skipping turn\",\"20:19 Player 1 played No Card\",\"20:19 Switched to Player 2's turn\"]",
       "gameOver": false,
       "gameState": "[0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]",
+      "handSize": 3,
       "initialPieces": 5,
       "lastPlayedCard": -1,
       "lastPlayedCardPlayer": 99,

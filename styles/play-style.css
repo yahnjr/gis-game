@@ -101,6 +101,27 @@ body {
     display: block;
 }
 
+.reopen-game-over-btn {
+    padding: 8px 16px;
+    background: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    display: none;
+    white-space: nowrap;
+}
+
+.reopen-game-over-btn:hover {
+    background: #1976D2;
+}
+
+.reopen-game-over-btn:active {
+    background: #1565C0;
+}
+
 .control-label {
     font-size: 10px;
     color: #999;
@@ -381,7 +402,6 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
     display: none;
     align-items: center;
     justify-content: center;
@@ -390,7 +410,7 @@ body {
     font-weight: bold;
     color: #fff;
     cursor: not-allowed;
-    backdrop-filter: blur(2px);
+    border: 2px solid #ed454a;
 }
 
 #board-overlay {
@@ -406,6 +426,10 @@ body {
     align-items: center;
     justify-content: center;
     padding: 20px;
+}
+
+#board-overlay.game-over-overlay {
+    transition: display 0.3s ease;
 }
 
 .card-selector-container {
@@ -680,7 +704,6 @@ body {
     }
 }
 
-/* Game Over Screen Styles */
 #choice-content.game-over-container {
     display: flex;
     flex-direction: column;
@@ -771,7 +794,6 @@ body {
     justify-content: center;
 }
 
-/* Layer Button Styles */
 .layer-btn {
     width: 100%;
     display: flex;
@@ -779,7 +801,6 @@ body {
     justify-content: center;
 }
 
-/* Card Selection Grid Styles */
 .card-selection-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
@@ -799,7 +820,6 @@ body {
     display: none;
 }
 
-/* Collaboration Reveal Card Styles */
 .collaboration-reveal-card {
     background-color: white;
     color: #333;
@@ -818,14 +838,12 @@ body {
     line-height: 1.4;
 }
 
-/* Collaboration Button Container */
 .collaboration-reveal-buttons {
     display: flex;
     gap: 10px;
     justify-content: center;
 }
 
-/* Cumulative Score Styles */
 .cumulative-score-div {
     text-align: center;
     margin-top: 15px;
